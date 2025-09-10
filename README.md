@@ -1,11 +1,6 @@
 # GroupTask Collaborative To-Do App
 
-[My Notes](notes.md)
-
 GroupTask is a collaborative to-do list application that transforms individual task management into a team effort. Users can create shared projects (like "Group Presentation," "Apartment Cleaning," or "Event Planning") and invite friends, roommates, or classmates to join. Within each project, team members can add tasks, assign them to specific people, and track progress together. The key feature is real-time synchronization - when anyone marks a task complete, adds a new item, or makes changes, everyone in the group sees the updates instantly. Each project also includes a built-in chat feature for quick coordination and communication, making it perfect for group projects, household chores, event planning, or any collaborative effort that requires shared accountability.
-
-> [!NOTE]
->  If you are not familiar with Markdown then you should review the [documentation](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) before continuing.
 
 ## 🚀 Specification Deliverable
 For this deliverable I did the following. I checked the box `[x]` and added a description for things I completed.
@@ -13,8 +8,8 @@ For this deliverable I did the following. I checked the box `[x]` and added a de
 - [x] Proper use of Markdown
 - [x] A concise and compelling elevator pitch
 - [x] Description of key features
-- [ ] Description of how you will use each technology
-- [ ] One or more rough sketches of your application. Images must be embedded in this file using Markdown image references.
+- [x] Description of how you will use each technology
+- [x] One or more rough sketches of your application. Images must be embedded in this file using Markdown image references.
 
 ### Elevator pitch
 Juggling tasks in a group project can be chaotic, with constant messages and missed updates. GroupTask solves this by providing a single, shared space for all your to-do lists. Our app allows you to create projects, assign tasks to members, and see live status updates the moment someone completes an item. It's the perfect tool to ensure everyone is on the same page and projects get done efficiently.
@@ -23,10 +18,6 @@ Juggling tasks in a group project can be chaotic, with constant messages and mis
 <img src="startuppg1.png" width="500" height="500">
 <img src="startuppg2.png" width="500" height="500">
 <img src="startuppg3.png" width="500" height="500">
-
-Here is a sequence diagram that shows how to people would interact with the backend to work on projects.
-
-![Design image](startup1.png)
 
 ### Key features
 
