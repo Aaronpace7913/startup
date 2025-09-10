@@ -20,10 +20,9 @@ For this deliverable I did the following. I checked the box `[x]` and added a de
 Juggling tasks in a group project can be chaotic, with constant messages and missed updates. GroupTask solves this by providing a single, shared space for all your to-do lists. Our app allows you to create projects, assign tasks to members, and see live status updates the moment someone completes an item. It's the perfect tool to ensure everyone is on the same page and projects get done efficiently.
 ### Design
 
-<img src="startup1.png" width="500" height="500">
-
-![Design image](startup1.png)
-
+<img src="startuppg1.png" width="500" height="500">
+<img src="startuppg2.png" width="500" height="500">
+<img src="startuppg3.png" width="500" height="500">
 
 Here is a sequence diagram that shows how to people would interact with the backend to work on projects.
 
