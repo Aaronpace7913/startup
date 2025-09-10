@@ -1,4 +1,4 @@
-# GroupTask Collaborative To-Do App
+# GroupTask -The Collaborative To-Do App
 
 GroupTask is a collaborative to-do list application that transforms individual task management into a team effort. Users can create shared projects (like "Group Presentation," "Apartment Cleaning," or "Event Planning") and invite friends, roommates, or classmates to join. Within each project, team members can add tasks, assign them to specific people, and track progress together. The key feature is real-time synchronization - when anyone marks a task complete, adds a new item, or makes changes, everyone in the group sees the updates instantly. Each project also includes a built-in chat feature for quick coordination and communication, making it perfect for group projects, household chores, event planning, or any collaborative effort that requires shared accountability.
 
