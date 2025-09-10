@@ -1,4 +1,5 @@
 # CS 260 Notes
+I learned how to use Github to 
 
 [My startup - Simon](https://simon.cs260.click)
 
