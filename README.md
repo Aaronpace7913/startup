@@ -8,15 +8,11 @@ GroupTask is a collaborative to-do list application designed to help teams and g
 >  If you are not familiar with Markdown then you should review the [documentation](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) before continuing.
 
 ## 🚀 Specification Deliverable
-
-> [!NOTE]
->  Fill in this sections as the submission artifact for this deliverable. You can refer to this [example](https://github.com/webprogramming260/startup-example/blob/main/README.md) for inspiration.
-
 For this deliverable I did the following. I checked the box `[x]` and added a description for things I completed.
 
-- [ ] Proper use of Markdown
+- [x] Proper use of Markdown
 - [x] A concise and compelling elevator pitch
-- [ ] Description of key features
+- [x] Description of key features
 - [ ] Description of how you will use each technology
 - [ ] One or more rough sketches of your application. Images must be embedded in this file using Markdown image references.
 
@@ -24,7 +20,7 @@ For this deliverable I did the following. I checked the box `[x]` and added a de
 Juggling tasks in a group project can be chaotic, with constant messages and missed updates. GroupTask solves this by providing a single, shared space for all your to-do lists. Our app allows you to create projects, assign tasks to members, and see live status updates the moment someone completes an item. It's the perfect tool to ensure everyone is on the same page and projects get done efficiently.
 ### Design
 
-![Design image](placeholder.png)
+![Design image](startuppg1.png)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
@@ -49,12 +45,12 @@ sequenceDiagram
 
 I am going to use the required technologies in the following ways.
 
-- **HTML** - Description here
-- **CSS** - Description here
-- **React** - Description here
-- **Service** - Description here
-- **DB/Login** - Description here
-- **WebSocket** - Description here
+- **HTML** - HTML will define what kind of content is being displayed. A task's name would be in an HTML element, as would the names of projects and users.
+- **CSS** - CSS will be used to style GroupTask and give it a polished, visually appealing look.
+- **React** - Keep track of the app's current data with different task items and various other elements in the application. It would also create key components such as a projectlist compononet to show all projects, task item component for each individual task, and a sidebar for navigation.
+- **Service** - Acts as the intermediary between the front-end and the database, handling all requests for creating projects, adding tasks, and managing user data.
+- **DB/Login** - A database stores all user, project, and task data. A secure login system with authentication tokens ensures only authorized users can access their information.
+- **WebSocket** - The core technology for real-time functionality. It pushes live updates from the server to all connected users in a group, instantly showing when a task is completed or changed without the need to refresh the page.
 
 ## 🚀 AWS deliverable
 
