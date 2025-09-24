@@ -50,21 +50,21 @@ names of projects and users.
 
 For this deliverable I did the following. I checked the box `[x]` and added a description for things I completed.
 
-- [ ] **Server deployed and accessible with custom domain name** - [My server link](https://yourdomainnamehere.click).
+- [X] **Server deployed and accessible with custom domain name** - [My server link](https://grouptask.click).
 
 ## 🚀 HTML deliverable
 
 For this deliverable I did the following. I checked the box `[x]` and added a description for things I completed.
 
-- [ ] **HTML pages** - I did not complete this part of the deliverable.
-- [ ] **Proper HTML element usage** - I did not complete this part of the deliverable.
-- [ ] **Links** - I did not complete this part of the deliverable.
-- [ ] **Text** - I did not complete this part of the deliverable.
-- [ ] **3rd party API placeholder** - I did not complete this part of the deliverable.
-- [ ] **Images** - I did not complete this part of the deliverable.
-- [ ] **Login placeholder** - I did not complete this part of the deliverable.
-- [ ] **DB data placeholder** - I did not complete this part of the deliverable.
-- [ ] **WebSocket placeholder** - I did not complete this part of the deliverable.
+- [X] **HTML pages** - Five different pages. One for each view. `index.html` (Login), `dashboard.html`, `taskdetail.html`, `about.html` and, `chat.html`.
+- [X] **Proper HTML element usage** - I spent a lot of time learning about elements. I used header, footer, main, nav, img, a, fieldset, input, button, form, and many more.
+- [X] **Links** - Links between views.
+- [X] **Text** - About page has text.
+- [X] **3rd party API placeholder** - About page has a place to display an inspirational quote.
+- [X] **Images** - Image is displayed on the about page and on the header for every page.
+- [X] **Login placeholder** - Placeholder for auth on the login page.
+- [X] **DB data placeholder** - The current projects will be listen in the dashboard page which will be taken from a database. For now though, I have just filled it in with some placeholders.
+- [X] **WebSocket placeholder** - The chat page has a text area that will show the live message when someone is writting. The Taskdetail page will also show updates that have been made on the current project.
 
 ## 🚀 CSS deliverable
 
