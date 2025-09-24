@@ -10,6 +10,7 @@
   <body>
     <!-- Use header, main, and footer elements to give semantic structure -->
     <header>
+      <img src="Logo.png" alt="GroupTask Logo" width="50" height="50" />
       <h1>GroupTask</h1>
 
       <!-- Navigation elements -->
@@ -26,9 +27,8 @@
       <!-- Since we don't have the ability to style we use old style HTML to give some visual formatting -->
       <hr />
     </header>
-
-    <main>
- <div id="task-and-chat-container">
+      <main>
+          <div id="task-and-chat-container">
             <section id="tasks">
                 <h2>TASKS</h2>
                 <a href="#">+ ADD TASK</a>
@@ -38,9 +38,15 @@
                     <li><input type="checkbox"> Task 3 - Pending</li>
                     <li><input type="checkbox"> Task 4 - Pending</li>
                 </ul>
+
             </section>
         </div>
-    </main>
+        <div id="recent-activity">
+          <p>🔔 Sarah just completed "Task 1" (2 minutes ago)</p>
+          <p>🔔 Mike added new task "Review slides" (5 minutes ago)</p>
+          <p>🔔 John is currently working on "Task 3"</p>
+        </div>
+      </main>
 
     <footer>
       <hr />
