@@ -87,3 +87,21 @@ main {
   color: #2d5230;
   margin-bottom: 1rem;
 }
+.login-form {
+  background: white;
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: 0 15px 35px rgba(45, 82, 48, 0.1);
+  max-width: 400px;
+  margin: 0 auto 3rem;
+  border: 2px solid #e8f5e8
+}
+.form-group {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
