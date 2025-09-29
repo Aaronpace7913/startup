@@ -11,54 +11,71 @@
   <body>
     <!-- Use header, main, and footer elements to give semantic structure -->
     <header>
-      <img src="Logo.png" alt="GroupTask Logo" width="50" height="50" />
-      <h1>GroupTask</h1>
-      <div style="float: right; margin-top: 10px;">
-        <span>Welcome, <strong id="username-display">John Doe</strong>!</span>
-        <button type="button" style="margin-left: 10px;">Logout</button>
+      <div class="container">
+        <div class="header-content">
+          <div class="logo-section">
+            <div class="logo">GT</div>
+            <div class="logo-text">GroupTask</div>
+          </div>
+          <div class="user-section">
+            <span class="welcome-text">Welcome,<span class="username"  id="username-display">John Doe</span>!</span>
+            <button class="logout-btn" type="button">Logout</button>
+          </div>
+          <nav>
+            <menu>
+              <li><a href="index.html">Home</a></li>
+              <li><a href="dashboard.html">Dashboard</a></li>
+              <li><a href="chat.html">Chat</a></li>
+              <li><a href="about.html">About</a></li>
+            </menu>
+          </nav>
+        </div>
       </div>
-
-      <!-- Navigation elements -->
-      <nav>
-        <!-- Menu is a semantic alternative to <ul> that represents an interaction -->
-        <menu>
-          <li><a href="index.html">Home</a></li>
-          <li><a href="dashboard.html">Dashboard</a></li>
-          <li><a href="chat.html">Chat</a></li>
-          <li><a href="about.html">About</a></li>
-        </menu>
-      </nav>
-
-      <!-- Since we don't have the ability to style we use old style HTML to give some visual formatting -->
-      <hr />
     </header>
 
-    <main>
+    <main class="container">
       <div class= "dashboard-header">
-        <h2>My Projects (from database)</h2>
-        <button>+ New Project</button>
+        <h2>My Projects</h2>
+        <button class="new-project-btn">+ New Project</button>
       </div>
       
         <section id="projects-container">
             <div class="project-card">
-                <a href="taskdetail.html">Project Name</a>
-                <p>5/8 tasks done</p>
+                <a href="taskdetail.html">Group Presentation</a>
+                ,<div class="project-progress">
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: 62.5%"></div>
+                    </div>
+                    <span class="progress-text">5/8 tasks done</span>
+                </div>
             </div>
             <div class="project-card">
-                <a href="taskdetail.html">Project Name</a>
-                <p>2/6 tasks done</p>
+                <a href="taskdetail.html">Apartment Cleaning</a>
+                ,<div class="project-progress">
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: 62.5%"></div>
+                    </div>
+                    <span class="progress-text">2/6 tasks done</span>
+                </div>
             </div>
             <div class="project-card">
-                <a href="taskdetail.html">Project Name</a>
-                <p>8/10 tasks done</p>
+                <a href="taskdetail.html">Event Planning</a>
+                ,<div class="project-progress">
+                    <div class="progress-bar">
+                       <div class="progress-fill" style="width: 62.5%"></div>
+                    </div>
+                    <span class="progress-text">8/10 tasks done</span>
+                </div>
             </div>
         </section>
     </main>
     <footer>
-      <hr />
-      <span class="text-reset">Author Name(s)</span>
-      <br />
-      <a href="https://github.com/webprogramming260/simon-html">GitHub</a>
+      <div class="footer">
+        <div class="footer-content">
+          <p>Created by <strong>Aaron Pace</strong></p>
+          <p><a href="https://github.com/Aaronpace7913/startup.git">View on GitHub</a></p>
+        </div>
+      </div>
     </footer>
   </body>
 </html>
