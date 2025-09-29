@@ -128,10 +128,67 @@ main {
   transform: scale(1.02);
 }
 
-.about
-
-
-
+.about-content{
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2.5rem;
+  margin-left: 100px;
+  margin-right: 100px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(45, 82, 48, 0.1);
+  border: 1px solid rgba(168, 230, 163, 0.2);
+}
+.about-content p {
+  color: #4a7c4f;
+  font-size: 1.1rem;
+  text-align: justify;
+  line-height: 1.8;
+}
+#quote {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 20px 40px rgba(45, 82, 48, 0.1);
+  border-left: 5px solid #6fcf67;
+  border: 1px solid rgba(168, 230, 163, 0.2);
+  position: relative;
+  overflow: hidden;
+  margin-left: 100px;
+  margin-right: 100px;
+  margin-top: 30px;
+}
+#quote p {
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
+}
+ #quote p em {
+  display: inline-block;
+  background: linear-gradient(135deg, rgba(168, 230, 163, 0.3), rgba(111, 207, 103, 0.2));
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #2d5230;
+  font-weight: 600;
+ }
+ .quote-text {
+  font-size: 1.3rem;
+  font-style: italic;
+  color: #2d5230;
+  margin: 1.5rem 0;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+ }
+ .quote-author {
+  font-size: 1rem;
+  color: #6fcf67;
+  font-weight: 600;
+  text-align: right;
+  margin-top: 1rem;
+  position: relative;
+  z-index: 1;
+ }
 .footer {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
