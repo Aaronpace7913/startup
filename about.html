@@ -9,35 +9,41 @@
   </head>
   <body>
     <header>
-      <img src="Logo.png" alt="GroupTask Logo" width="50" height="50" />
-      <h1>GroupTask</h1>
-
-      <!-- Navigation elements -->
-      <nav>
-        <menu>
-          <li><a href="index.html">Home</a></li>
-          <li><a href="dashboard.html">Dashboard</a></li>
-          <li><a href="chat.html">Chat</a></li>
-          <li><a href="about.html">About</a></li>
-        </menu>
-      </nav>
-
-      <hr />
+      <div class="container">
+        <div class="header-content">
+          <div class="logo-section">
+            <div class="logo">GT</div>
+            <div class="logo-text">GroupTask</div>
+          </div>
+          <div class="user-section">
+            <span class="welcome-text">Welcome,<span class="username"  id="username-display">John Doe</span>!</span>
+            <button class="logout-btn" type="button">Logout</button>
+          </div>
+          <nav>
+            <menu>
+              <li><a href="index.html">Home</a></li>
+              <li><a href="dashboard.html">Dashboard</a></li>
+              <li><a href="chat.html">Chat</a></li>
+              <li><a href="about.html">About</a></li>
+            </menu>
+          </nav>
+        </div>
+      </div>
     </header>
 
     <main>
-      <div id="picture" class="picture-box"><img width="400px" src="img for cs260 startup.jpg" alt="random" /></div>
-
-      <p>
-        GroupTask is a collaborative to-do list application that transforms individual task management into a team effort. 
-        Users can create shared projects (like "Group Presentation," "Apartment Cleaning," or "Event Planning") 
-        and invite friends, roommates, or classmates to join. 
-        Within each project, team members can add tasks, assign them to specific people, and track progress together. 
-        The key feature is real-time synchronization - when anyone marks a task complete, adds a new item, or makes changes, everyone in the group sees the updates instantly. 
-        Each project also includes a built-in chat feature for quick coordination and communication, making it perfect for group projects, 
-        household chores, event planning, or any collaborative effort that requires shared accountability.
-      </p>
-      
+      <div class="picture-box"><img width="400px" src="img for cs260 startup.jpg" alt="random" /></div>
+      <div class="about-content">
+        <p>
+          GroupTask is a collaborative to-do list application that transforms individual task management into a team effort. 
+          Users can create shared projects (like "Group Presentation," "Apartment Cleaning," or "Event Planning") 
+          and invite friends, roommates, or classmates to join. 
+          Within each project, team members can add tasks, assign them to specific people, and track progress together. 
+          The key feature is real-time synchronization - when anyone marks a task complete, adds a new item, or makes changes, everyone in the group sees the updates instantly. 
+          Each project also includes a built-in chat feature for quick coordination and communication, making it perfect for group projects, 
+          household chores, event planning, or any collaborative effort that requires shared accountability.
+        </p>
+      </div>
   <!-- 3rd Party Service: This quote will be replaced with a motivational quotes API call -->
       
   
@@ -49,10 +55,12 @@
     </main>
 
     <footer>
-      <hr />
-      <span class="text-reset">Aaron Pace</span>
-      <br />
-      <a href="https://github.com/Aaronpace7913/startup.git">GitHub</a>
+      <div class="footer">
+        <div class="footer-content">
+          <p>Created by <strong>Aaron Pace</strong></p>
+          <p><a href="https://github.com/Aaronpace7913/startup.git">View on GitHub</a></p>
+        </div>
+      </div>
     </footer>
   </body>
 </html>

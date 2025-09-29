@@ -9,31 +9,36 @@
   </head>
   <body>
     <header>
-      <img src="Logo.png" alt="GroupTask Logo" width="50" height="50" />
-      <h1>GroupTask</h1>
-      <div style="float: right; margin-top: 10px;">
-        <span>Welcome, <strong id="username-display">John Doe</strong>!</span>
-        <button type="button" style="margin-left: 10px;">Logout</button>
+      <div class="container">
+        <div class="header-content">
+          <div class="logo-section">
+            <div class="logo">GT</div>
+            <div class="logo-text">GroupTask</div>
+          </div>
+          <div class="user-section">
+            <span class="welcome-text">Welcome,<span class="username"  id="username-display">John Doe</span>!</span>
+            <button class="logout-btn" type="button">Logout</button>
+          </div>
+          <nav>
+            <menu>
+              <li><a href="index.html">Home</a></li>
+              <li><a href="dashboard.html">Dashboard</a></li>
+              <li><a href="chat.html">Chat</a></li>
+              <li><a href="about.html">About</a></li>
+            </menu>
+          </nav>
+        </div>
       </div>
-
-      <nav>
-        <menu>
-          <li><a href="index.html">Home</a></li>
-          <li><a href="dashboard.html">Dashboard</a></li>
-          <li><a href="chat.html">Chat</a></li>
-          <li><a href="about.html">About</a></li>
-        </menu>
-      </nav>
-      <hr />
     </header>
 
-    <main>
+    <main class="container">
       <section id="team-chat">
                 <h2>TEAM CHAT</h2>
                 <div id="chat-messages-placeholder">
-                    <p><strong>User 1:</strong> Message here</p>
-                    <p><strong>User 2:</strong> Another message</p>
-                    <p><strong>User 1:</strong> Reply message</p>
+                    <p><strong>User 1:</strong> Hey team! How's the project coming along?</p>
+                    <p><strong>User 2:</strong> Making great progress! Just finished my tasks.</p>
+                    <p><strong>User 1:</strong> Awesome! I'll review them this afternoon.</p>
+                    <p><strong>User 2:</strong> Sounds good. Let me know if you need anything!</p>
                     <p><em>Sarah is typing... (live via WebSocket)</em></p>
                 </div>
                 <div id="chat-input">
@@ -44,10 +49,12 @@
     </main>
 
     <footer>
-      <hr />
-      <span class="text-reset">Aaron Pace</span>
-      <br />
-      <a href="https://github.com/Aaronpace7913/startup.git">GitHub</a>
+      <div class="footer">
+        <div class="footer-content">
+          <p>Created by <strong>Aaron Pace</strong></p>
+          <p><a href="https://github.com/Aaronpace7913/startup.git">View on GitHub</a></p>
+        </div>
+      </div>
     </footer>
   </body>
 </html>
