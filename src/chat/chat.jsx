@@ -3,7 +3,7 @@ import './chat.css';
 
 export function Chat() {
   return (
-    <main className="container">
+    <main>
       <section id="team-chat">
                 <h2>TEAM CHAT</h2>
                 <div id="chat-messages-placeholder">

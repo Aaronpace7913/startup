@@ -10,7 +10,7 @@ main {
   margin-top: 10px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  padding: 4rem 2rem;
+  padding: 4rem 10rem;
   border-radius: 20px;
   box-shadow: 0 4px 30px rgba(45, 82, 48, 0.1);
   border: 1px solid rgba(168, 230, 163, 0.3);
