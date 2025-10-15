@@ -8,8 +8,20 @@ import { Chat} from './chat/chat';
 import { About } from './about/about';
 import { Taskdetail } from './taskdetail/taskdetail';
 import { Login } from './login/login';
+import {AuthState} from './login/authState';
+
 
 function App() {
+  const [userName, setUserName] = React.useState(localStorage.getItem('userName') || '');
+  const currentAuthState = userName ? AuthState.Authenticated : AuthState.Unauthenticated;
+  const [authState, setAuthState] = React.useState(currentAuthState);
+
+  const handleLogout = () => {
+    localStorage.removeItem('userName');
+    setUserName('');
+    setAuthState(AuthState.Unauthenticated);
+};
+
   return (
     <BrowserRouter>
       <div className="body">
@@ -22,26 +34,55 @@ function App() {
             <nav>
               <menu>
                 <li><NavLink to="/">Home</NavLink></li>
-                <li><NavLink to="dashboard">Dashboard</NavLink></li>
-                <li><NavLink to="chat">Chat</NavLink></li>
+                {authState === AuthState.Authenticated && (
+                  <>
+                  <li><NavLink to="dashboard">Dashboard</NavLink></li>
+                  <li><NavLink to="chat">Chat</NavLink></li>
+                  </>
+                )}
                 <li><NavLink to="about">About</NavLink></li>
+                {authState === AuthState.Authenticated && (
+                  <li>
+                    <a 
+                      href="#" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLogout();
+                      }}
+                    >
+                      Logout
+                    </a>
+                  </li>
+                )}
               </menu>
             </nav>
           </div>
         </header>
 
         <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/chat" element={<Chat />} />
+          <Route path="/" 
+          element={
+          <Login 
+            userName={userName}
+            authState={authState}
+            onAuthChange={(userName, authState) => {
+              setUserName(userName);
+              setAuthState(authState);
+            }}
+          />
+          } 
+        />
+          <Route path="/dashboard" element={<Dashboard userName= {userName} />} />
+          <Route path="/chat" element={<Chat userName = {userName} />} />
           <Route path="/about" element={<About />} />
           <Route path="/taskdetail" element={<Taskdetail />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <footer>
           <div className="footer-content">
             Created by <strong>Aaron Pace</strong>
             <br />
-            <NavLink href="#">View on GitHub</NavLink>
+            <NavLink to="https://github.com/Aaronpace7913/startup">View on GitHub</NavLink>
           </div>
         </footer>
       </div>
@@ -49,7 +90,6 @@ function App() {
   );
 }
 
-export default App;
 
 function NotFound() {
   return (
@@ -58,3 +98,5 @@ function NotFound() {
     </main>
   );
 }
+
+export default App;

@@ -2,9 +2,19 @@ import React from 'react';
 import './about.css';
 
 export function About() {
+  const [imageUrl, setImageUrl] = React.useState('data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=');
+  const [quote, setQuote] = React.useState('Loading...');
+  const [quoteAuthor, setQuoteAuthor] = React.useState('unknown');
+
+    React.useEffect(() => {
+      setImageUrl(`img for cs260 startup.jpg`);
+      setQuote('Words are cheap; Show me the code');
+      setQuoteAuthor('Linus Torvalds');
+    }, []);
+  
   return (
     <main>
-      <div className="picture-box"><img width="400px" src="img for cs260 startup.jpg" alt="random" /></div>
+      <div className="picture-box"><img width="400px" src={imageUrl} alt="random" /></div>
       <div className="about-content">
         <p>
           GroupTask is a collaborative to-do list application that transforms individual task management into a team effort. 
@@ -20,8 +30,8 @@ export function About() {
   
       <div id="quote">
           <p><em>🔗 3rd Party API: Random Quotes Service</em></p>
-        <div className="quote-text">Words are cheap. Show me the code.</div>
-        <div className="quote-author">- Linus Torvalds</div>
+        <div className="quote-text">{quote}</div>
+        <div className="quote-author">{quoteAuthor}</div>
       </div>
     </main>
   );
