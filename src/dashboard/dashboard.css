@@ -113,3 +113,79 @@ main{
 .empty-state p {
   color: #6b7280;
 }
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.modal-content h3 {
+  color: #2d5230;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e8f5e8;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.3s ease;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: #6fcf67;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel, .btn-create {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancel {
+  background: #e8f5e8;
+  color: #2d5230;
+}
+
+.btn-cancel:hover {
+  background: #d0e8cc;
+}
+
+.btn-create {
+  background: linear-gradient(135deg, #6fcf67, #4ade80);
+  color: white;
+}
+
+.btn-create:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(111, 207, 103, 0.4);
+}

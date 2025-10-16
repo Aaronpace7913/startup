@@ -77,7 +77,7 @@ function AppContent() {
         <Route path="/dashboard" element={<Dashboard userName={userName} />} />
         <Route path="/chat" element={<Chat userName={userName} />} />
         <Route path="/about" element={<About />} />
-        <Route path="/taskdetail" element={<Taskdetail />} />
+        <Route path="/taskdetail/:projectId" element={<Taskdetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <footer>
