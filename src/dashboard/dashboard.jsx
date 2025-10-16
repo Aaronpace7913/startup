@@ -69,6 +69,20 @@ export function Dashboard() {
     }
   };
 
+  const handleDeleteProject = (projectId, projectName, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (window.confirm(`Are you sure you want to delete "${projectName}"? This will remove all associated tasks and activities.`)) {
+      // Remove project from state
+      setProjects(projects.filter(p => p.id !== projectId));
+      
+      // Clean up localStorage
+      localStorage.removeItem(`tasks_${projectId}`);
+      localStorage.removeItem(`activities_${projectId}`);
+    }
+  };
+
   const calculateProgress = (completed, total) => {
     if (total === 0) return 0;
     return (completed / total) * 100;
@@ -93,9 +107,18 @@ export function Dashboard() {
           ) : (
             projects.map((project) => (
               <div className="project-card" key={project.id}>
-                <Link to={`/taskdetail/${project.id}`} state={{ project }}>
-                  {project.name}
-                </Link>
+                <div className="project-card-content">
+                  <Link to={`/taskdetail/${project.id}`} state={{ project }}>
+                    {project.name}
+                  </Link>
+                  <button 
+                    className="delete-project-btn"
+                    onClick={(e) => handleDeleteProject(project.id, project.name, e)}
+                    title="Delete project"
+                  >
+                    🗑️
+                  </button>
+                </div>
                 <div className="project-progress">
                   <div className="progress-bar">
                     <div
