@@ -70,9 +70,23 @@ main {
   display: inline-block;
   text-decoration: none;
 }
+.btn:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .btn-primary{
   background: linear-gradient(135deg, #6fcf67, #4ade80);
   color: white;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(76, 175, 80, 0.3);
 }
 .btn-primary:hover{
   transform: translateY(-2px);
@@ -86,4 +100,9 @@ main {
 .btn-secondary:hover{
   background:#6fcf67; ;
   color: white
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #6fcf67;
+  color: white;
 }
