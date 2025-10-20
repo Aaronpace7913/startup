@@ -1367,4 +1367,418 @@ console.log('3');
 ```
 
 **Why this order?**
-1. `
+1. `console.log('1')` - runs immediately (synchronous)
+2. `Promise.resolve().then()` - callback goes to **microtask queue**
+3. `console.log('3')` - runs immediately (synchronous)
+4. After synchronous code finishes, microtasks run
+5. `console.log('2')` - runs from microtask queue
+
+**Rule:** Synchronous code ALWAYS runs before Promise callbacks
+
+---
+
+### Common Promise Patterns
+
+#### Pattern 1: Simple Promise
+```javascript
+const promise = new Promise((resolve, reject) => {
+  setTimeout(() => resolve('Done!'), 1000);
+});
+
+promise.then(result => console.log(result));
+// Output (after 1 second): Done!
+```
+
+#### Pattern 2: Promise with Error
+```javascript
+const promise = new Promise((resolve, reject) => {
+  const success = false;
+  if (success) {
+    resolve('Success!');
+  } else {
+    reject('Failed!');
+  }
+});
+
+promise
+  .then(result => console.log(result))
+  .catch(error => console.log(error));
+// Output: Failed!
+```
+
+#### Pattern 3: Chained Operations
+```javascript
+fetch('https://api.example.com/data')
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));
+```
+
+---
+
+### Promise Methods
+
+#### Promise.resolve()
+**Creates immediately resolved promise**
+```javascript
+Promise.resolve(42)
+  .then(value => console.log(value)); // 42
+```
+
+#### Promise.reject()
+**Creates immediately rejected promise**
+```javascript
+Promise.reject('Error!')
+  .catch(error => console.log(error)); // Error!
+```
+
+#### Promise.all()
+**Wait for all promises to resolve**
+```javascript
+const p1 = Promise.resolve(1);
+const p2 = Promise.resolve(2);
+const p3 = Promise.resolve(3);
+
+Promise.all([p1, p2, p3])
+  .then(results => console.log(results)); // [1, 2, 3]
+```
+- If ANY promise rejects, entire thing rejects
+
+#### Promise.race()
+**Returns first promise to settle**
+```javascript
+const p1 = new Promise(resolve => setTimeout(() => resolve('slow'), 100));
+const p2 = new Promise(resolve => setTimeout(() => resolve('fast'), 50));
+
+Promise.race([p1, p2])
+  .then(result => console.log(result)); // 'fast'
+```
+
+---
+
+### Async/Await (Alternative Syntax)
+
+**Converting Promises to Async/Await:**
+
+**Promise Style:**
+```javascript
+function getData() {
+  return fetch('https://api.example.com')
+    .then(response => response.json())
+    .then(data => console.log(data))
+    .catch(error => console.error(error));
+}
+```
+
+**Async/Await Style:**
+```javascript
+async function getData() {
+  try {
+    const response = await fetch('https://api.example.com');
+    const data = await response.json();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+**Key Points:**
+- `async` keyword before function
+- `await` keyword before promise
+- `try/catch` for error handling
+- Makes async code look synchronous
+
+---
+
+## Quick Reference Cheat Sheet
+
+### HTML Quick Reference
+```
+<!DOCTYPE html>                  Declare HTML5
+<link rel="stylesheet" href="">  Link CSS file
+<div>                           Block container
+<span>                          Inline container (default: inline)
+<a href=""><img src=""></a>     Image with link
+<script src=""></script>        Include JavaScript
+```
+
+### CSS Quick Reference
+```
+#id          Select by ID (unique)
+.class       Select by class (multiple)
+element      Select by tag name
+
+Box Model (inside → out): Content → Padding → Border → Margin
+
+display: block        Full width, new line
+display: inline       No new line, width as needed
+display: flex         Flexible layout
+```
+
+### CSS Selectors Priority
+```
+1. Inline styles (highest)
+2. IDs (#id)
+3. Classes (.class), attributes, pseudo-classes
+4. Elements (div, p, span)
+```
+
+### JavaScript Quick Reference
+```javascript
+// Arrow functions
+const func = (x) => x * 2;
+
+// Array map
+[1, 2, 3].map(x => x * 2) // [2, 4, 6]
+
+// Objects
+const obj = { key: "value" };
+obj.newKey = "new"; // Can add properties
+
+// JSON
+JSON.stringify(obj)  // Object → String
+JSON.parse(string)   // String → Object
+```
+
+### DOM Quick Reference
+```javascript
+// Select elements
+document.getElementById('id')
+document.querySelector('.class')
+document.querySelectorAll('.class')
+
+// Modify elements
+element.textContent = 'text'
+element.style.color = 'red'
+element.classList.add('class')
+
+// Events
+element.addEventListener('click', () => {})
+```
+
+### Command Line Quick Reference
+```bash
+ssh user@host    Remote shell session
+ls -la           List all files with details
+pwd              Show current directory
+cd path          Change directory
+mkdir name       Create directory
+mv old new       Move/rename
+rm file          Delete file
+```
+
+### Networking Quick Reference
+```
+Domain: subdomain.root.TLD
+  - .com, .org, etc = TLD
+  - example.com = root domain
+  - www.example.com = subdomain
+
+Ports:
+  - 80  = HTTP (unencrypted)
+  - 443 = HTTPS (encrypted, needs certificate)
+  - 22  = SSH (secure shell)
+
+DNS A Record → IP Address (not another domain)
+HTTPS requires web certificate (YES)
+```
+
+### Promise Quick Reference
+```javascript
+// Create promise
+new Promise((resolve, reject) => {
+  if (success) resolve(value);
+  else reject(error);
+});
+
+// Use promise
+promise
+  .then(result => {})
+  .catch(error => {})
+  .finally(() => {});
+
+// Execution order
+Synchronous code runs first
+Promise callbacks run after (microtask queue)
+```
+
+---
+
+## Common Exam Traps & Tips
+
+### HTML/CSS Traps
+❌ Forgetting `<!DOCTYPE html>` is first line
+❌ Using `id` instead of `class` for multiple elements
+❌ Confusing padding (inside) with margin (outside)
+❌ Wrong box model order
+✅ Remember: Content → Padding → Border → Margin
+
+### JavaScript Traps
+❌ Forgetting `const`/`let`/`var` in declarations
+❌ Using `=` (assignment) instead of `===` (comparison)
+❌ Forgetting `return` in functions
+❌ Not understanding map creates NEW array
+✅ Arrow functions: `x => x * 2` for implicit return
+
+### DOM Traps
+❌ Forgetting `#` with querySelector for IDs
+❌ Using `getElementById('#id')` - no # needed!
+❌ Confusing `textContent` vs `innerHTML`
+❌ Not checking if element exists before manipulating
+✅ Always select element before modifying
+
+### Promise Traps
+❌ Thinking promises run synchronously
+❌ Forgetting synchronous code runs first
+❌ Not handling errors with `.catch()`
+✅ Remember: sync code → then microtasks (promises)
+
+### Command Line Traps
+❌ Confusing `ssh` with other commands
+❌ Not knowing `-la` means "list all with details"
+❌ Forgetting `rm` is permanent (no undo!)
+✅ ssh = remote shell, ls -la = all files detailed
+
+### Networking Traps
+❌ Thinking A record points to domains (it's IP addresses!)
+❌ Confusing TLD with subdomain
+❌ Not knowing HTTPS requires certificate
+❌ Mixing up port numbers
+✅ 80=HTTP, 443=HTTPS, 22=SSH
+
+---
+
+## Practice Question Patterns
+
+### Pattern Recognition Tips
+
+**When you see HTML with class/id:**
+→ Think about CSS selectors (. vs #)
+
+**When you see padding/margin:**
+→ Think inside vs outside
+
+**When you see array.map():**
+→ New array, same length, transformed values
+
+**When you see Promise code:**
+→ Check execution order (sync first, then async)
+
+**When you see getElementById:**
+→ No # symbol needed in the parameter
+
+**When you see querySelector:**
+→ Use # for id, . for class
+
+**When you see domain name:**
+→ Read right to left: TLD → root → subdomain
+
+**When you see port number:**
+→ 80=HTTP, 443=HTTPS, 22=SSH
+
+**When you see ls -la:**
+→ All files including hidden, with details
+
+**When you see box model:**
+→ Inside to out: Content → Padding → Border → Margin
+
+---
+
+## Study Strategy
+
+### Before the Exam:
+1. ✅ Review each section of these notes
+2. ✅ Write out common syntax from memory
+3. ✅ Quiz yourself on key differences (# vs ., padding vs margin)
+4. ✅ Practice execution order with Promise examples
+5. ✅ Memorize port numbers (80, 443, 22)
+6. ✅ Memorize box model order
+7. ✅ Review command line commands and what they do
+
+### During the Exam:
+1. Read each question carefully
+2. Eliminate obviously wrong answers first
+3. Look for keywords:
+   - "ID" → think #
+   - "class" → think .
+   - "inside" → think padding
+   - "outside" → think margin
+   - "remote" → think SSH
+   - "secure" → think HTTPS/443 or SSH/22
+4. For code execution questions, trace through line by line
+5. For Promise questions, identify sync vs async code first
+
+### Memory Tricks:
+
+**Box Model:** "**C**an **P**andas **B**e **M**ean?" = Content, Padding, Border, Margin
+
+**Ports:** "**8**0 is **H**TTP, **4**43 is **HTTPS** (4 letters), **22** is **S**SH"
+
+**Selectors:** "**#** looks like number = **one** ID", "**.** looks like multiple points = **many** classes"
+
+**Padding vs Margin:** "**P**adding **P**ushes in, **M**argin **M**akes space out"
+
+**Domain:** "Read domains backwards: **.com** came first (TLD), then **example**, then **www**"
+
+**Promises:** "**S**ync **B**efore **A**sync" (Synchronous Before Asynchronous)
+
+---
+
+## Final Checklist
+
+Before exam, make sure you can answer:
+
+### HTML
+- [ ] What does `<link>` do?
+- [ ] What does `<div>` do?
+- [ ] How to declare HTML5 document?
+- [ ] What are the heading tags (h1, h2, h3)?
+- [ ] How to create image with hyperlink?
+- [ ] How to include JavaScript in HTML?
+
+### CSS
+- [ ] Difference between # and . selectors?
+- [ ] Difference between padding and margin?
+- [ ] Box model order (inside to outside)?
+- [ ] What is default display for `<span>`?
+- [ ] How to select all divs and change their background?
+- [ ] How does flexbox work?
+
+### JavaScript
+- [ ] Arrow function syntax?
+- [ ] What does array.map() do?
+- [ ] How to create an object?
+- [ ] Can you add properties to objects?
+- [ ] What is valid JSON?
+- [ ] Syntax for if/else, for, while, switch?
+
+### DOM
+- [ ] What is the DOM?
+- [ ] How to use getElementById?
+- [ ] How to use querySelector with # selector?
+- [ ] How to use addEventListener?
+- [ ] How to change element text color?
+- [ ] How to change specific element's text?
+
+### Command Line
+- [ ] What does each command do (chmod, pwd, cd, ls, vim, etc.)?
+- [ ] Which command creates remote shell session?
+- [ ] What does ls -la show?
+
+### Networking
+- [ ] In a domain name, which is TLD, root, subdomain?
+- [ ] Is certificate necessary for HTTPS?
+- [ ] Can A record point to another A record?
+- [ ] Which ports for HTTP, HTTPS, SSH?
+
+### Promises
+- [ ] What will Promise code output?
+- [ ] Synchronous vs asynchronous execution order?
+- [ ] How to use .then() and .catch()?
+
+---
+
+**Good luck on your exam! 🎓**
+
+Remember: These notes cover everything you need. Take your time, read questions carefully, and trust your preparation!
