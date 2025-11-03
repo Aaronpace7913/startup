@@ -2,25 +2,51 @@ import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './app.css';
 
-import { BrowserRouter, NavLink, Route, Routes, useNavigate} from 'react-router-dom';
+import { BrowserRouter, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { Dashboard } from './dashboard/dashboard';
-import { Chat} from './chat/chat';
+import { Chat } from './chat/chat';
 import { About } from './about/about';
 import { Taskdetail } from './taskdetail/taskdetail';
 import { Login } from './login/login';
-import {AuthState} from './login/authState';
+import { AuthState } from './login/authState';
 
 function AppContent() {
   const navigate = useNavigate();
-  const [userName, setUserName] = React.useState(localStorage.getItem('userName') || '');
-  const currentAuthState = userName ? AuthState.Authenticated : AuthState.Unauthenticated;
-  const [authState, setAuthState] = React.useState(currentAuthState);
+  const [userName, setUserName] = React.useState('');
+  const [authState, setAuthState] = React.useState(AuthState.Unauthenticated);
 
-  const handleLogout = () => {
-    localStorage.removeItem('userName');
-    setUserName('');
-    setAuthState(AuthState.Unauthenticated);
-    navigate('/');
+  // Check authentication status on mount
+  React.useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/user');
+      if (response.ok) {
+        const data = await response.json();
+        setUserName(data.email);
+        setAuthState(AuthState.Authenticated);
+      } else {
+        setAuthState(AuthState.Unauthenticated);
+      }
+    } catch (err) {
+      console.error('Auth check failed:', err);
+      setAuthState(AuthState.Unauthenticated);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'DELETE',
+      });
+      setUserName('');
+      setAuthState(AuthState.Unauthenticated);
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
   };
 
   return (
@@ -34,12 +60,12 @@ function AppContent() {
           <nav>
             <menu>
               {authState === AuthState.Unauthenticated && (
-              <li><NavLink to="/">Home</NavLink></li>
+                <li><NavLink to="/">Home</NavLink></li>
               )}
               {authState === AuthState.Authenticated && (
                 <>
-                <li><NavLink to="dashboard">Dashboard</NavLink></li>
-                <li><NavLink to="chat">Chat</NavLink></li>
+                  <li><NavLink to="dashboard">Dashboard</NavLink></li>
+                  <li><NavLink to="chat">Chat</NavLink></li>
                 </>
               )}
               <li><NavLink to="about">About</NavLink></li>
@@ -62,24 +88,26 @@ function AppContent() {
       </header>
 
       <Routes>
-        <Route path="/" 
-        element={
-        <Login 
-          userName={userName}
-          authState={authState}
-          onAuthChange={(userName, authState) => {
-            setUserName(userName);
-            setAuthState(authState);
-          }}
+        <Route 
+          path="/" 
+          element={
+            <Login 
+              userName={userName}
+              authState={authState}
+              onAuthChange={(userName, authState) => {
+                setUserName(userName);
+                setAuthState(authState);
+              }}
+            />
+          } 
         />
-        } 
-      />
         <Route path="/dashboard" element={<Dashboard userName={userName} />} />
         <Route path="/chat" element={<Chat userName={userName} />} />
         <Route path="/about" element={<About />} />
-        <Route path="/taskdetail/:projectId" element={<Taskdetail />} />
+        <Route path="/taskdetail/:projectId" element={<Taskdetail userName={userName} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      
       <footer>
         <div className="footer-content">
           Created by <strong>Aaron Pace</strong>
@@ -91,7 +119,7 @@ function AppContent() {
   );
 }
 
-// Main App component just wraps everything in BrowserRouter
+// Main App component wraps everything in BrowserRouter
 function App() {
   return (
     <BrowserRouter>
