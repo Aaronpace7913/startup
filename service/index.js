@@ -6,30 +6,22 @@ const app = express();
 
 const authCookieName = 'token';
 
-// In-memory storage (will disappear on restart - consider MongoDB later)
 let users = [];
 let projects = [];
-let tasks = {};  // Format: { projectId: [tasks] }
-let chatMessages = {};  // Format: { projectId: [messages] }
-let activities = {};  // Format: { projectId: [activities] }
+let tasks = {}; 
+let chatMessages = {};
+let activities = {};
 
-// The service port - MUST be 4000 for your startup
 const port = process.argv.length > 2 ? process.argv[2] : 4000;
 
-// JSON body parsing using built-in middleware
 app.use(express.json());
 
-// Use the cookie parser middleware for tracking authentication tokens
 app.use(cookieParser());
 
-// Serve up the front-end static content hosting
 app.use(express.static('public'));
 
-// Router for service endpoints
 var apiRouter = express.Router();
 app.use(`/api`, apiRouter);
-
-// ==================== AUTHENTICATION ENDPOINTS ====================
 
 // Create a new user
 apiRouter.post('/auth/create', async (req, res) => {
@@ -77,9 +69,7 @@ apiRouter.get('/auth/user', async (req, res) => {
   }
 });
 
-// ==================== MIDDLEWARE ====================
 
-// Middleware to verify that the user is authorized
 async function verifyAuth(req, res, next) {
   const user = await findUser('token', req.cookies[authCookieName]);
   if (user) {
@@ -90,7 +80,6 @@ async function verifyAuth(req, res, next) {
   }
 }
 
-// ==================== PROJECT ENDPOINTS ====================
 
 // Get all projects for the current user
 apiRouter.get('/projects', verifyAuth, (req, res) => {
@@ -111,9 +100,9 @@ apiRouter.post('/projects', verifyAuth, (req, res) => {
   };
   
   projects.push(newProject);
-  tasks[newProject.id] = [];  // Initialize empty tasks array
-  chatMessages[newProject.id] = [];  // Initialize empty chat
-  activities[newProject.id] = [];  // Initialize empty activities
+  tasks[newProject.id] = [];
+  chatMessages[newProject.id] = [];
+  activities[newProject.id] = []; 
   
   res.send(newProject);
 });
@@ -159,7 +148,6 @@ apiRouter.delete('/projects/:id', verifyAuth, (req, res) => {
   }
 });
 
-// ==================== TASK ENDPOINTS ====================
 
 // Get all tasks for a project
 apiRouter.get('/projects/:id/tasks', verifyAuth, (req, res) => {
@@ -241,7 +229,6 @@ apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, (req, res) =>
   }
 });
 
-// ==================== CHAT ENDPOINTS ====================
 
 // Get all chat messages for a project
 apiRouter.get('/projects/:id/messages', verifyAuth, (req, res) => {
@@ -279,13 +266,11 @@ apiRouter.post('/projects/:id/messages', verifyAuth, (req, res) => {
   }
 });
 
-// Get global chat messages (not project-specific)
 apiRouter.get('/messages', verifyAuth, (req, res) => {
   // For global chat, we'll use a special key
   res.send(chatMessages['global'] || []);
 });
 
-// Post a global chat message
 apiRouter.post('/messages', verifyAuth, (req, res) => {
   const newMessage = {
     id: Date.now(),
@@ -302,7 +287,6 @@ apiRouter.post('/messages', verifyAuth, (req, res) => {
   res.send(newMessage);
 });
 
-// ==================== ACTIVITY ENDPOINTS ====================
 
 // Get activities for a project
 apiRouter.get('/projects/:id/activities', verifyAuth, (req, res) => {
@@ -340,7 +324,6 @@ apiRouter.post('/projects/:id/activities', verifyAuth, (req, res) => {
   }
 });
 
-// ==================== HELPER FUNCTIONS ====================
 
 // Update project progress based on task completion
 function updateProjectProgress(projectId) {
@@ -382,8 +365,6 @@ function setAuthCookie(res, authToken) {
   });
 }
 
-// ==================== ERROR HANDLING ====================
-
 // Default error handler
 app.use(function (err, req, res, next) {
   res.status(500).send({ type: err.name, message: err.message });
@@ -394,7 +375,6 @@ app.use((_req, res) => {
   res.sendFile('index.html', { root: 'public' });
 });
 
-// ==================== START SERVER ====================
 
 app.listen(port, () => {
   console.log(`GroupTask service listening on port ${port}`);
