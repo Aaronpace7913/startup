@@ -1,156 +1,214 @@
 import React from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
 
-export function Taskdetail() {
+export function Taskdetail({ userName }) {
   const { projectId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
   
-  // Load project from localStorage or location state
-  const [project, setProject] = React.useState(() => {
-    if (location.state?.project) {
-      return location.state.project;
-    }
-    // Try to load from localStorage
-    const savedProjects = localStorage.getItem('projects');
-    if (savedProjects) {
-      const projects = JSON.parse(savedProjects);
-      const found = projects.find(p => p.id === parseInt(projectId));
-      if (found) return found;
-    }
-    return { id: projectId, name: 'Project', completed: 0, total: 0 };
-  });
-  
-  // Load tasks from localStorage
-  const [tasks, setTasks] = React.useState(() => {
-    const tasksKey = `tasks_${projectId}`;
-    const saved = localStorage.getItem(tasksKey);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    // Default tasks only if it's one of the original projects
-    if (projectId === '1' || projectId === '2' || projectId === '3') {
-      return [
-        { id: 1, text: 'Task 1 - Completed', completed: true },
-        { id: 2, text: 'Task 2 - Pending', completed: false },
-        { id: 3, text: 'Task 3 - Pending', completed: false },
-        { id: 4, text: 'Task 4 - Pending', completed: false }
-      ];
-    }
-    return [];
-  });
-
-  // Load activities from localStorage
-  const [activities, setActivities] = React.useState(() => {
-    const activitiesKey = `activities_${projectId}`;
-    const saved = localStorage.getItem(activitiesKey);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return [
-      { id: 1, message: '🔔 Welcome to your project!' }
-    ];
-  });
-
+  const [project, setProject] = React.useState(null);
+  const [tasks, setTasks] = React.useState([]);
+  const [activities, setActivities] = React.useState([]);
   const [showModal, setShowModal] = React.useState(false);
   const [newTaskText, setNewTaskText] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
 
-  // Save tasks to localStorage whenever they change
+  // Load project, tasks, and activities on mount
   React.useEffect(() => {
-    const tasksKey = `tasks_${projectId}`;
-    localStorage.setItem(tasksKey, JSON.stringify(tasks));
-    
-    // Dispatch custom event to notify Dashboard
-    window.dispatchEvent(new Event('tasksUpdated'));
-  }, [tasks, projectId]);
+    loadProjectData();
+  }, [projectId]);
 
-  // Save activities to localStorage whenever they change
-  React.useEffect(() => {
-    const activitiesKey = `activities_${projectId}`;
-    localStorage.setItem(activitiesKey, JSON.stringify(activities));
-  }, [activities, projectId]);
+  const loadProjectData = async () => {
+    try {
+      // Load project
+      const projectRes = await fetch(`/api/projects/${projectId}`);
+      if (projectRes.ok) {
+        const projectData = await projectRes.json();
+        setProject(projectData);
+      } else {
+        console.error('Failed to load project');
+        navigate('/dashboard');
+        return;
+      }
 
-  // Update project progress when tasks change
-  React.useEffect(() => {
-    const completedCount = tasks.filter(task => task.completed).length;
-    const updatedProject = {
-      ...project,
-      completed: completedCount,
-      total: tasks.length
-    };
-    setProject(updatedProject);
-    
-    // Update in localStorage projects array
-    const savedProjects = localStorage.getItem('projects');
-    if (savedProjects) {
-      const projects = JSON.parse(savedProjects);
-      const updatedProjects = projects.map(p => 
-        p.id === parseInt(projectId) ? updatedProject : p
-      );
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
-    }
-  }, [tasks, projectId]);
+      // Load tasks
+      const tasksRes = await fetch(`/api/projects/${projectId}/tasks`);
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        setTasks(tasksData);
+      }
 
-  const handleAddTask = () => {
-    if (newTaskText.trim()) {
-      const newTask = {
-        id: Date.now(),
-        text: newTaskText,
-        completed: false
-      };
-      setTasks([...tasks, newTask]);
-      
-      // Add activity
-      const newActivity = {
-        id: Date.now(),
-        message: `🔔 You added new task "${newTaskText}" (just now)`
-      };
-      setActivities([newActivity, ...activities]);
-      
-      setNewTaskText('');
-      setShowModal(false);
+      // Load activities
+      const activitiesRes = await fetch(`/api/projects/${projectId}/activities`);
+      if (activitiesRes.ok) {
+        const activitiesData = await activitiesRes.json();
+        setActivities(activitiesData);
+      }
+    } catch (err) {
+      console.error('Error loading project data:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleToggleTask = (taskId) => {
-    setTasks(tasks.map(task => {
-      if (task.id === taskId) {
-        const newCompleted = !task.completed;
+  const handleAddTask = async () => {
+    if (newTaskText.trim()) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: newTaskText })
+        });
+
+        if (response.ok) {
+          const newTask = await response.json();
+          setTasks([...tasks, newTask]);
+          
+          // Add activity
+          await addActivity(`You added new task "${newTaskText}"`);
+          
+          setNewTaskText('');
+          setShowModal(false);
+          
+          // Reload project to get updated progress
+          await loadProject();
+        } else {
+          alert('Failed to create task. Please try again.');
+        }
+      } catch (err) {
+        console.error('Error creating task:', err);
+        alert('Error creating task. Please try again.');
+      }
+    }
+  };
+
+  const handleToggleTask = async (task) => {
+    try {
+      const newCompleted = !task.completed;
+      
+      const response = await fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: newCompleted })
+      });
+
+      if (response.ok) {
+        // Update task in local state
+        const updatedTask = { ...task, completed: newCompleted };
+        setTasks(tasks.map(t => t.id === task.id ? updatedTask : t));
         
         // Add activity
         const activityMessage = newCompleted 
-          ? `🔔 You completed "${task.text}" (just now)`
-          : `🔔 You uncompleted "${task.text}" (just now)`;
+          ? `You completed "${task.text}"`
+          : `You uncompleted "${task.text}"`;
+        await addActivity(activityMessage);
         
-        const newActivity = {
-          id: Date.now(),
-          message: activityMessage
-        };
-        setActivities([newActivity, ...activities]);
-        
-        return { ...task, completed: newCompleted };
+        // Reload project to get updated progress
+        await loadProject();
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to update task:', errorText);
+        alert('Failed to update task. Please try again.');
       }
-      return task;
-    }));
+    } catch (err) {
+      console.error('Error updating task:', err);
+      alert('Error updating task. Please try again.');
+    }
   };
 
-  const handleDeleteTask = (taskId) => {
-    const taskToDelete = tasks.find(task => task.id === taskId);
-    setTasks(tasks.filter(task => task.id !== taskId));
-    
-    // Add activity
-    const newActivity = {
-      id: Date.now(),
-      message: `🔔 You deleted "${taskToDelete.text}" (just now)`
-    };
-    setActivities([newActivity, ...activities]);
+  const handleDeleteTask = async (task) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setTasks(tasks.filter(t => t.id !== task.id));
+        
+        // Add activity
+        await addActivity(`You deleted "${task.text}"`);
+        
+        // Reload project to get updated progress
+        await loadProject();
+      } else {
+        alert('Failed to delete task. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Error deleting task. Please try again.');
+    }
+  };
+
+  const addActivity = async (action) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          user: userName || 'User',
+          action: action 
+        })
+      });
+
+      if (response.ok) {
+        const newActivity = await response.json();
+        setActivities([newActivity, ...activities]);
+      }
+    } catch (err) {
+      console.error('Error adding activity:', err);
+    }
+  };
+
+  const loadProject = async () => {
+    try {
+      const projectRes = await fetch(`/api/projects/${projectId}`);
+      if (projectRes.ok) {
+        const projectData = await projectRes.json();
+        setProject(projectData);
+      }
+    } catch (err) {
+      console.error('Error reloading project:', err);
+    }
   };
 
   const calculateProgress = () => {
-    if (tasks.length === 0) return 0;
-    return (tasks.filter(task => task.completed).length / tasks.length) * 100;
+    if (!project || project.total === 0) return 0;
+    return (project.completed / project.total) * 100;
   };
+
+  const formatActivityTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
+
+  if (loading) {
+    return (
+      <main>
+        <div className="container">
+          <div className="loading">Loading project...</div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!project) {
+    return (
+      <main>
+        <div className="container">
+          <div className="error">Project not found</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main>
@@ -190,12 +248,12 @@ export function Taskdetail() {
                   <input
                     type="checkbox"
                     checked={task.completed}
-                    onChange={() => handleToggleTask(task.id)}
+                    onChange={() => handleToggleTask(task)}
                   />
                   <span>{task.text}</span>
                   <button 
                     className="delete-task-btn"
-                    onClick={() => handleDeleteTask(task.id)}
+                    onClick={() => handleDeleteTask(task)}
                   >
                     🗑️
                   </button>
@@ -207,9 +265,15 @@ export function Taskdetail() {
       </div>
 
       <div id="recent-activity">
-        {activities.map((activity) => (
-          <p key={activity.id}>{activity.message}</p>
-        ))}
+        {activities.length === 0 ? (
+          <p>🔔 No recent activity</p>
+        ) : (
+          activities.map((activity) => (
+            <p key={activity.id}>
+              🔔 {activity.user} {activity.action} ({formatActivityTime(activity.timestamp)})
+            </p>
+          ))
+        )}
       </div>
 
       {/* Modal for adding new task */}
