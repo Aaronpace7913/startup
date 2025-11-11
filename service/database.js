@@ -76,3 +76,34 @@ async function deleteProject(projectId, ownerEmail) {
     });
 }
 
+// ============== Task Functions ==============
+async function getTasks(projectId) {
+    const cursor = taskCollection.find({ projectId: projectId });
+    return cursor.toArray();
+}
+
+async function addTask(task) {
+    return taskCollection.insertOne(task);
+    return task;
+}
+
+async function updateTask(projectId, taskId, updates) {
+    const result = await taskCollection.findOneAndUpdate(
+        { projectId: projectId, id: taskId },
+        { $set: updates },
+        { returnDocument: 'after' }
+    );
+    return result;
+}
+
+async function deleteTask(projectId, taskId) {
+    await taskCollection.deleteOne({
+         projectId: projectId, 
+         id: taskId 
+    });
+}
+
+async function deleteTasksByProject(projectId) {
+    await taskCollection.deleteMany({ projectId: projectId });
+}
+
