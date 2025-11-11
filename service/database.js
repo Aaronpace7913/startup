@@ -107,3 +107,20 @@ async function deleteTasksByProject(projectId) {
     await taskCollection.deleteMany({ projectId: projectId });
 }
 
+// =============== Message Functions ==============
+async function getMessages(projectId) {
+    const cursor = messageCollection
+        .find({ projectId: projectId })
+        .sort({ timestamp: 1 });
+    return cursor.toArray();
+}
+
+async function addMessage(message) {
+    return messageCollection.insertOne(message);
+    return message;
+}
+
+async function deleteMessagesByProject(projectId) {
+    await messageCollection.deleteMany({ projectId: projectId });
+}
+
