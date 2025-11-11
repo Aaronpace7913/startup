@@ -124,3 +124,48 @@ async function deleteMessagesByProject(projectId) {
     await messageCollection.deleteMany({ projectId: projectId });
 }
 
+// =============== Activity Functions ==============
+async function getActivities(projectId) {
+    const cursor = activityCollection
+        .find({ projectId: projectId })
+        .sort({ timestamp: -1 });
+    return cursor.toArray();
+}
+
+async function addActivity(activity) {
+    return activityCollection.insertOne(activity);
+    return activity;
+}
+
+async function deleteActivitiesByProject(projectId) {
+    await activityCollection.deleteMany({ projectId: projectId });
+}
+
+module.exports = {
+  getUser,
+  getUserByToken,
+  addUser,
+  updateUser,
+
+  // Project functions
+  getProjects,
+  getProject,
+  addProject,
+  updateProject,
+  deleteProject,
+
+  // Task functions
+    getTasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    deleteTasksByProject,
+    // Message functions
+    getMessages,
+    addMessage,
+    deleteMessagesByProject,
+    // Activity functions
+    getActivities,
+    addActivity,
+    deleteActivitiesByProject,
+};
