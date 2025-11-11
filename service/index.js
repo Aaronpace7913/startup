@@ -4,21 +4,14 @@ const express = require('express');
 const uuid = require('uuid');
 const app = express();
 const DB = require('./database.js');
+const { Db } = require('mongodb');
 
 const authCookieName = 'token';
-
-let users = [];
-let projects = [];
-let tasks = {}; 
-let chatMessages = {};
-let activities = {};
 
 const port = process.argv.length > 2 ? process.argv[2] : 4000;
 
 app.use(express.json());
-
 app.use(cookieParser());
-
 app.use(express.static('public'));
 
 var apiRouter = express.Router();
@@ -54,6 +47,7 @@ apiRouter.delete('/auth/logout', async (req, res) => {
   const user = await findUser('token', req.cookies[authCookieName]);
   if (user) {
     delete user.token;
+    await Db.updateUser(user);
   }
   res.clearCookie(authCookieName);
   res.status(204).end();
@@ -83,14 +77,14 @@ async function verifyAuth(req, res, next) {
 
 
 // Get all projects for the current user
-apiRouter.get('/projects', verifyAuth, (req, res) => {
+apiRouter.get('/projects', verifyAuth, async (req, res) => {
   // Filter projects by user email
-  const userProjects = projects.filter(p => p.owner === req.user.email);
+  const userProjects = await DB.getProjects(req.user.email);
   res.send(userProjects);
 });
 
 // Create a new project
-apiRouter.post('/projects', verifyAuth, (req, res) => {
+apiRouter.post('/projects', verifyAuth, async (req, res) => {
   const newProject = {
     id: Date.now(),
     name: req.body.name,
@@ -100,19 +94,15 @@ apiRouter.post('/projects', verifyAuth, (req, res) => {
     createdAt: new Date().toISOString()
   };
   
-  projects.push(newProject);
-  tasks[newProject.id] = [];
-  chatMessages[newProject.id] = [];
-  activities[newProject.id] = []; 
-  
+  await DB.addProject(newProject);
   res.send(newProject);
 });
 
 // Get a specific project
-apiRouter.get('/projects/:id', verifyAuth, (req, res) => {
+apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
-  
+  const project = await DB.getProject(projectId, req.user.email);
+ 
   if (project) {
     res.send(project);
   } else {
@@ -121,28 +111,27 @@ apiRouter.get('/projects/:id', verifyAuth, (req, res) => {
 });
 
 // Update a project
-apiRouter.put('/projects/:id', verifyAuth, (req, res) => {
+apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const projectIndex = projects.findIndex(p => p.id === projectId && p.owner === req.user.email);
+  const projectIndex = DB.updateProject(projectId, req.user.email, req.body);
   
-  if (projectIndex !== -1) {
-    projects[projectIndex] = { ...projects[projectIndex], ...req.body };
-    res.send(projects[projectIndex]);
+  if (updatedProject) {
+    res.send(updatedProject);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
 // Delete a project
-apiRouter.delete('/projects/:id', verifyAuth, (req, res) => {
+apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const projectIndex = projects.findIndex(p => p.id === projectId && p.owner === req.user.email);
-  
-  if (projectIndex !== -1) {
-    projects.splice(projectIndex, 1);
-    delete tasks[projectId];
-    delete chatMessages[projectId];
-    delete activities[projectId];
+  const projectIndex = await DB.getProject(projectId, req.user.email);
+
+  if (project) {
+    await DB.deleteProject(projectId, req.user.email);
+    await DB.deleteTasksByProject(projectId);
+    await DB.deleteMessagesByProject(projectId);
+    await DB.deleteActivitiesByProject(projectId);
     res.status(204).end();
   } else {
     res.status(404).send({ msg: 'Project not found' });
@@ -151,21 +140,22 @@ apiRouter.delete('/projects/:id', verifyAuth, (req, res) => {
 
 
 // Get all tasks for a project
-apiRouter.get('/projects/:id/tasks', verifyAuth, (req, res) => {
+apiRouter.get('/projects/:id/tasks', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
-    res.send(tasks[projectId] || []);
+    const tasks = await DB.getTasks(projectId);
+    res.send(tasks);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
 // Create a new task
-apiRouter.post('/projects/:id/tasks', verifyAuth, (req, res) => {
+apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
     const newTask = {
@@ -175,14 +165,9 @@ apiRouter.post('/projects/:id/tasks', verifyAuth, (req, res) => {
       completed: false,
       createdAt: new Date().toISOString()
     };
-    
-    if (!tasks[projectId]) {
-      tasks[projectId] = [];
-    }
-    tasks[projectId].push(newTask);
-    
-    // Update project totals
-    updateProjectProgress(projectId);
+
+    await DB.addTask(newTask);
+    await DB.updateProjectProgress(projectId, req.user.email);
     
     res.send(newTask);
   } else {
@@ -191,17 +176,16 @@ apiRouter.post('/projects/:id/tasks', verifyAuth, (req, res) => {
 });
 
 // Update a task
-apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, (req, res) => {
+apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.projectId);
   const taskId = parseInt(req.params.taskId);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
-  if (project && tasks[projectId]) {
-    const taskIndex = tasks[projectId].findIndex(t => t.id === taskId);
-    if (taskIndex !== -1) {
-      tasks[projectId][taskIndex] = { ...tasks[projectId][taskIndex], ...req.body };
-      updateProjectProgress(projectId);
-      res.send(tasks[projectId][taskIndex]);
+  if (project) {
+    const updatedTask = await DB.updateTask(projectId, taskId, req.body);
+    if (updatedTask) {
+      await DB.updateProjectProgress(projectId, req.user.email);
+      res.send(updatedTask);
     } else {
       res.status(404).send({ msg: 'Task not found' });
     }
@@ -211,20 +195,15 @@ apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, (req, res) => {
 });
 
 // Delete a task
-apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, (req, res) => {
+apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.projectId);
   const taskId = parseInt(req.params.taskId);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
-  if (project && tasks[projectId]) {
-    const taskIndex = tasks[projectId].findIndex(t => t.id === taskId);
-    if (taskIndex !== -1) {
-      tasks[projectId].splice(taskIndex, 1);
-      updateProjectProgress(projectId);
-      res.status(204).end();
-    } else {
-      res.status(404).send({ msg: 'Task not found' });
-    }
+  if (project) {
+    await DB.deleteTask(projectId, taskId);
+    await DB.updateProjectProgress(projectId, req.user.email);
+    res.status(204).end();
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
@@ -232,93 +211,85 @@ apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, (req, res) =>
 
 
 // Get all chat messages for a project
-apiRouter.get('/projects/:id/messages', verifyAuth, (req, res) => {
+apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
-    res.send(chatMessages[projectId] || []);
+    const messages = await DB.getMessages(projectId);
+    res.send(messages);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
 // Post a new chat message
-apiRouter.post('/projects/:id/messages', verifyAuth, (req, res) => {
+apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
   
   if (project) {
     const newMessage = {
       id: Date.now(),
+      projectId: projectId,
       user: req.body.user,
       text: req.body.text,
       timestamp: new Date().toISOString()
     };
-    
-    if (!chatMessages[projectId]) {
-      chatMessages[projectId] = [];
-    }
-    chatMessages[projectId].push(newMessage);
-    
+    await DB.addMessage(newMessage);
     res.send(newMessage);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
-apiRouter.get('/messages', verifyAuth, (req, res) => {
-  // For global chat, we'll use a special key
-  res.send(chatMessages['global'] || []);
+apiRouter.get('/messages', verifyAuth, async (req, res) => {
+  const messages = await DB.getMessages('global');
+  res.send(messages);
 });
 
-apiRouter.post('/messages', verifyAuth, (req, res) => {
+apiRouter.post('/messages', verifyAuth, async (req, res) => {
   const newMessage = {
     id: Date.now(),
+    projectId: 'global',
     user: req.body.user,
     text: req.body.text,
     timestamp: new Date().toISOString()
   };
   
-  if (!chatMessages['global']) {
-    chatMessages['global'] = [];
-  }
-  chatMessages['global'].push(newMessage);
-  
+  await DB.addMessage(newMessage);
   res.send(newMessage);
 });
 
 
 // Get activities for a project
-apiRouter.get('/projects/:id/activities', verifyAuth, (req, res) => {
+apiRouter.get('/projects/:id/activities', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
-    res.send(activities[projectId] || []);
+    const activities = await DB.getActivities(projectId);
+    res.send(activities);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
 // Post a new activity
-apiRouter.post('/projects/:id/activities', verifyAuth, (req, res) => {
+apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
     const newActivity = {
       id: Date.now(),
+      projectId: projectId,
       user: req.body.user,
       action: req.body.action,
       timestamp: new Date().toISOString()
     };
-    
-    if (!activities[projectId]) {
-      activities[projectId] = [];
-    }
-    activities[projectId].push(newActivity);
-    
+
+    await DB.addActivity(newActivity);
     res.send(newActivity);
   } else {
     res.status(404).send({ msg: 'Project not found' });
@@ -327,13 +298,15 @@ apiRouter.post('/projects/:id/activities', verifyAuth, (req, res) => {
 
 
 // Update project progress based on task completion
-function updateProjectProgress(projectId) {
-  const project = projects.find(p => p.id === projectId);
-  if (project && tasks[projectId]) {
-    const projectTasks = tasks[projectId];
-    project.total = projectTasks.length;
-    project.completed = projectTasks.filter(t => t.completed).length;
-  }
+async function updateProjectProgress(projectId, ownerEmail) {
+  const tasks = await getTasks(projectId);
+  const totalTasks = tasks.length;
+  const completed = tasks.filter(t => t.completed).length;
+  
+  await DB.updateProject(projectId, ownerEmail, {
+    completed: completed,
+    total: total
+  });
 }
 
 // Create a new user
@@ -345,7 +318,7 @@ async function createUser(email, password) {
     password: passwordHash,
     token: uuid.v4(),
   };
-  users.push(user);
+  await DB.addUser(user);
   
   return user;
 }
@@ -353,7 +326,11 @@ async function createUser(email, password) {
 // Find a user by field and value
 async function findUser(field, value) {
   if (!value) return null;
-  return users.find((u) => u[field] === value);
+
+  if (field === 'token') {
+    return DB.getUserByToken(value);
+  }
+  return DB.getUser(value)
 }
 
 // Set authentication cookie
