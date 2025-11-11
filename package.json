@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
+    "mongodb": "^7.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.3"
