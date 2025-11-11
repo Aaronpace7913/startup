@@ -12,17 +12,18 @@ const taskCollection = db.collection('task');
 const messageCollection = db.collection('message');
 const activityCollection = db.collection('activity');
 
+// Test the connection
 (async function testConnection() {
   try {
     await db.command({ ping: 1 });
-    console.log(`Connect to database`);
+    console.log('Connected to database');
   } catch (ex) {
     console.log(`Unable to connect to database with ${url} because ${ex.message}`);
     process.exit(1);
   }
 })();
 
-// User functions
+// ========== USER FUNCTIONS ==========
 function getUser(email) {
   return userCollection.findOne({ email: email });
 }
@@ -38,134 +39,137 @@ async function addUser(user) {
 async function updateUser(user) {
   await userCollection.updateOne(
     { email: user.email }, 
-    { $set: user });
-}   
+    { $set: user }
+  );
+}
 
-// Additional functions for projects, tasks, messages, and activities can be added here
-
+// ========== PROJECT FUNCTIONS ==========
 async function getProjects(ownerEmail) {
-  return cursor = projectCollection.find({ owner: ownerEmail });
+  const cursor = projectCollection.find({ owner: ownerEmail });
   return cursor.toArray();
 }
 
 async function getProject(projectId, ownerEmail) {
-    return projectCollection.findOne({
-         _id: projectId, 
-         owner: ownerEmail 
-});
+  return projectCollection.findOne({ 
+    id: projectId, 
+    owner: ownerEmail 
+  });
 }
 
 async function addProject(project) {
-  return projectCollection.insertOne(project);
+  await projectCollection.insertOne(project);
   return project;
 }
 
 async function updateProject(projectId, ownerEmail, updates) {
-    const result = await projectCollection.findOneAndUpdate(
-        { _id: projectId, owner: ownerEmail },
-        { $set: updates },
-        { returnDocument: 'after' }
-    );
-    return result;
+  const result = await projectCollection.findOneAndUpdate(
+    { id: projectId, owner: ownerEmail },
+    { $set: updates },
+    { returnDocument: 'after' }
+  );
+  return result;
 }
 
 async function deleteProject(projectId, ownerEmail) {
-    await projectCollection.deleteOne({
-         _id: projectId, 
-         owner: ownerEmail 
-    });
+  await projectCollection.deleteOne({ 
+    id: projectId, 
+    owner: ownerEmail 
+  });
 }
 
-// ============== Task Functions ==============
+// ========== TASK FUNCTIONS ==========
 async function getTasks(projectId) {
-    const cursor = taskCollection.find({ projectId: projectId });
-    return cursor.toArray();
+  const cursor = taskCollection.find({ projectId: projectId });
+  return cursor.toArray();
 }
 
 async function addTask(task) {
-    return taskCollection.insertOne(task);
-    return task;
+  await taskCollection.insertOne(task);
+  return task;
 }
 
 async function updateTask(projectId, taskId, updates) {
-    const result = await taskCollection.findOneAndUpdate(
-        { projectId: projectId, id: taskId },
-        { $set: updates },
-        { returnDocument: 'after' }
-    );
-    return result;
+  const result = await taskCollection.findOneAndUpdate(
+    { projectId: projectId, id: taskId },
+    { $set: updates },
+    { returnDocument: 'after' }
+  );
+  return result;
 }
 
 async function deleteTask(projectId, taskId) {
-    await taskCollection.deleteOne({
-         projectId: projectId, 
-         id: taskId 
-    });
+  await taskCollection.deleteOne({ 
+    projectId: projectId, 
+    id: taskId 
+  });
 }
 
 async function deleteTasksByProject(projectId) {
-    await taskCollection.deleteMany({ projectId: projectId });
+  await taskCollection.deleteMany({ projectId: projectId });
 }
 
-// =============== Message Functions ==============
+// ========== MESSAGE FUNCTIONS ==========
 async function getMessages(projectId) {
-    const cursor = messageCollection
-        .find({ projectId: projectId })
-        .sort({ timestamp: 1 });
-    return cursor.toArray();
+  const cursor = messageCollection
+    .find({ projectId: projectId })
+    .sort({ timestamp: 1 });
+  return cursor.toArray();
 }
 
 async function addMessage(message) {
-    return messageCollection.insertOne(message);
-    return message;
+  await messageCollection.insertOne(message);
+  return message;
 }
 
 async function deleteMessagesByProject(projectId) {
-    await messageCollection.deleteMany({ projectId: projectId });
+  await messageCollection.deleteMany({ projectId: projectId });
 }
 
-// =============== Activity Functions ==============
+// ========== ACTIVITY FUNCTIONS ==========
 async function getActivities(projectId) {
-    const cursor = activityCollection
-        .find({ projectId: projectId })
-        .sort({ timestamp: -1 });
-    return cursor.toArray();
+  const cursor = activityCollection
+    .find({ projectId: projectId })
+    .sort({ timestamp: -1 });
+  return cursor.toArray();
 }
 
 async function addActivity(activity) {
-    return activityCollection.insertOne(activity);
-    return activity;
+  await activityCollection.insertOne(activity);
+  return activity;
 }
 
 async function deleteActivitiesByProject(projectId) {
-    await activityCollection.deleteMany({ projectId: projectId });
+  await activityCollection.deleteMany({ projectId: projectId });
 }
 
 module.exports = {
+  // User functions
   getUser,
   getUserByToken,
   addUser,
   updateUser,
-
+  
   // Project functions
   getProjects,
   getProject,
   addProject,
   updateProject,
   deleteProject,
-
+  
   // Task functions
-    getTasks,
-    addTask,
-    updateTask,
-    deleteTask,
-    deleteTasksByProject,
-    // Message functions
-    getMessages,
-    addMessage,
-    deleteMessagesByProject,
-    // Activity functions
-    getActivities,
-    addActivity,
-    deleteActivitiesByProject,
+  getTasks,
+  addTask,
+  updateTask,
+  deleteTask,
+  deleteTasksByProject,
+  
+  // Message functions
+  getMessages,
+  addMessage,
+  deleteMessagesByProject,
+  
+  // Activity functions
+  getActivities,
+  addActivity,
+  deleteActivitiesByProject,
 };

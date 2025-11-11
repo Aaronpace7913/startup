@@ -3,83 +3,77 @@ import './dashboard.css';
 import { Link } from 'react-router-dom';
 
 export function Dashboard() {
-  // Load projects from localStorage or use default
-  const [projects, setProjects] = React.useState(() => {
-    const saved = localStorage.getItem('projects');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return [
-      { id: 1, name: 'Group Presentation', completed: 5, total: 8 },
-      { id: 2, name: 'Apartment Cleaning', completed: 2, total: 6 },
-      { id: 3, name: 'Event Planning', completed: 8, total: 10 }
-    ];
-  });
-
+  const [projects, setProjects] = React.useState([]);
   const [showModal, setShowModal] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
 
-  // Save projects to localStorage whenever they change
+  // Load projects from backend on mount
   React.useEffect(() => {
-    localStorage.setItem('projects', JSON.stringify(projects));
-  }, [projects]);
-
-  // Update project progress from localStorage when component mounts
-  React.useEffect(() => {
-    const updateProjectsFromTasks = () => {
-      const updatedProjects = projects.map(project => {
-        const tasksKey = `tasks_${project.id}`;
-        const savedTasks = localStorage.getItem(tasksKey);
-        if (savedTasks) {
-          const tasks = JSON.parse(savedTasks);
-          const completed = tasks.filter(task => task.completed).length;
-          return {
-            ...project,
-            completed: completed,
-            total: tasks.length
-          };
-        }
-        return project;
-      });
-      setProjects(updatedProjects);
-    };
-
-    updateProjectsFromTasks();
-    
-    // Listen for custom event when tasks are updated
-    window.addEventListener('tasksUpdated', updateProjectsFromTasks);
-    return () => window.removeEventListener('tasksUpdated', updateProjectsFromTasks);
+    loadProjects();
   }, []);
 
-  const handleAddProject = () => {
-    if (newProjectName.trim()) {
-      const newProject = {
-        id: Date.now(),
-        name: newProjectName,
-        completed: 0,
-        total: 0
-      };
-      setProjects([...projects, newProject]);
-      
-      // Initialize empty tasks array for new project
-      localStorage.setItem(`tasks_${newProject.id}`, JSON.stringify([]));
-      
-      setNewProjectName('');
-      setShowModal(false);
+  const loadProjects = async () => {
+    try {
+      const response = await fetch('/api/projects');
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data);
+      } else {
+        console.error('Failed to load projects');
+      }
+    } catch (err) {
+      console.error('Error loading projects:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteProject = (projectId, projectName, e) => {
+  const handleAddProject = async () => {
+    if (newProjectName.trim()) {
+      try {
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newProjectName })
+        });
+
+        if (response.ok) {
+          const newProject = await response.json();
+          setProjects([...projects, newProject]);
+          setNewProjectName('');
+          setShowModal(false);
+        } else {
+          console.error('Failed to create project');
+          alert('Failed to create project. Please try again.');
+        }
+      } catch (err) {
+        console.error('Error creating project:', err);
+        alert('Error creating project. Please try again.');
+      }
+    }
+  };
+
+  const handleDeleteProject = async (projectId, projectName, e) => {
     e.preventDefault();
     e.stopPropagation();
     
     if (window.confirm(`Are you sure you want to delete "${projectName}"? This will remove all associated tasks and activities.`)) {
-      // Remove project from state
-      setProjects(projects.filter(p => p.id !== projectId));
-      
-      // Clean up localStorage
-      localStorage.removeItem(`tasks_${projectId}`);
-      localStorage.removeItem(`activities_${projectId}`);
+      try {
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          setProjects(projects.filter(p => p.id !== projectId));
+        } else {
+          console.error('Failed to delete project');
+          alert('Failed to delete project. Please try again.');
+        }
+      } catch (err) {
+        console.error('Error deleting project:', err);
+        alert('Error deleting project. Please try again.');
+      }
     }
   };
 
@@ -87,6 +81,16 @@ export function Dashboard() {
     if (total === 0) return 0;
     return (completed / total) * 100;
   };
+
+  if (loading) {
+    return (
+      <main>
+        <div className="container">
+          <div className="loading">Loading projects...</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main>

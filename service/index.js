@@ -4,7 +4,6 @@ const express = require('express');
 const uuid = require('uuid');
 const app = express();
 const DB = require('./database.js');
-const { Db } = require('mongodb');
 
 const authCookieName = 'token';
 
@@ -16,6 +15,8 @@ app.use(express.static('public'));
 
 var apiRouter = express.Router();
 app.use(`/api`, apiRouter);
+
+// ========== AUTHENTICATION ENDPOINTS ==========
 
 // Create a new user
 apiRouter.post('/auth/create', async (req, res) => {
@@ -34,6 +35,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   if (user) {
     if (await bcrypt.compare(req.body.password, user.password)) {
       user.token = uuid.v4();
+      await DB.updateUser(user);
       setAuthCookie(res, user.token);
       res.send({ email: user.email });
       return;
@@ -47,7 +49,7 @@ apiRouter.delete('/auth/logout', async (req, res) => {
   const user = await findUser('token', req.cookies[authCookieName]);
   if (user) {
     delete user.token;
-    await Db.updateUser(user);
+    await DB.updateUser(user);
   }
   res.clearCookie(authCookieName);
   res.status(204).end();
@@ -64,21 +66,22 @@ apiRouter.get('/auth/user', async (req, res) => {
   }
 });
 
+// ========== MIDDLEWARE ==========
 
 async function verifyAuth(req, res, next) {
   const user = await findUser('token', req.cookies[authCookieName]);
   if (user) {
-    req.user = user;  // Attach user to request
+    req.user = user;
     next();
   } else {
     res.status(401).send({ msg: 'Unauthorized' });
   }
 }
 
+// ========== PROJECT ENDPOINTS ==========
 
 // Get all projects for the current user
 apiRouter.get('/projects', verifyAuth, async (req, res) => {
-  // Filter projects by user email
   const userProjects = await DB.getProjects(req.user.email);
   res.send(userProjects);
 });
@@ -102,7 +105,7 @@ apiRouter.post('/projects', verifyAuth, async (req, res) => {
 apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
- 
+  
   if (project) {
     res.send(project);
   } else {
@@ -113,7 +116,7 @@ apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
 // Update a project
 apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const projectIndex = DB.updateProject(projectId, req.user.email, req.body);
+  const updatedProject = await DB.updateProject(projectId, req.user.email, req.body);
   
   if (updatedProject) {
     res.send(updatedProject);
@@ -125,8 +128,8 @@ apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
 // Delete a project
 apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const projectIndex = await DB.getProject(projectId, req.user.email);
-
+  const project = await DB.getProject(projectId, req.user.email);
+  
   if (project) {
     await DB.deleteProject(projectId, req.user.email);
     await DB.deleteTasksByProject(projectId);
@@ -138,6 +141,7 @@ apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
   }
 });
 
+// ========== TASK ENDPOINTS ==========
 
 // Get all tasks for a project
 apiRouter.get('/projects/:id/tasks', verifyAuth, async (req, res) => {
@@ -160,14 +164,15 @@ apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
   if (project) {
     const newTask = {
       id: Date.now(),
+      projectId: projectId,
       text: req.body.text,
       assignedTo: req.body.assignedTo || '',
       completed: false,
       createdAt: new Date().toISOString()
     };
-
+    
     await DB.addTask(newTask);
-    await DB.updateProjectProgress(projectId, req.user.email);
+    await updateProjectProgress(projectId, req.user.email);
     
     res.send(newTask);
   } else {
@@ -184,7 +189,7 @@ apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res)
   if (project) {
     const updatedTask = await DB.updateTask(projectId, taskId, req.body);
     if (updatedTask) {
-      await DB.updateProjectProgress(projectId, req.user.email);
+      await updateProjectProgress(projectId, req.user.email);
       res.send(updatedTask);
     } else {
       res.status(404).send({ msg: 'Task not found' });
@@ -202,13 +207,14 @@ apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, r
   
   if (project) {
     await DB.deleteTask(projectId, taskId);
-    await DB.updateProjectProgress(projectId, req.user.email);
+    await updateProjectProgress(projectId, req.user.email);
     res.status(204).end();
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
+// ========== MESSAGE ENDPOINTS ==========
 
 // Get all chat messages for a project
 apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
@@ -226,7 +232,7 @@ apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
 // Post a new chat message
 apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const project = projects.find(p => p.id === projectId && p.owner === req.user.email);
+  const project = await DB.getProject(projectId, req.user.email);
   
   if (project) {
     const newMessage = {
@@ -236,6 +242,7 @@ apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
       text: req.body.text,
       timestamp: new Date().toISOString()
     };
+    
     await DB.addMessage(newMessage);
     res.send(newMessage);
   } else {
@@ -243,6 +250,7 @@ apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
   }
 });
 
+// Global messages endpoints
 apiRouter.get('/messages', verifyAuth, async (req, res) => {
   const messages = await DB.getMessages('global');
   res.send(messages);
@@ -261,6 +269,7 @@ apiRouter.post('/messages', verifyAuth, async (req, res) => {
   res.send(newMessage);
 });
 
+// ========== ACTIVITY ENDPOINTS ==========
 
 // Get activities for a project
 apiRouter.get('/projects/:id/activities', verifyAuth, async (req, res) => {
@@ -288,7 +297,7 @@ apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
       action: req.body.action,
       timestamp: new Date().toISOString()
     };
-
+    
     await DB.addActivity(newActivity);
     res.send(newActivity);
   } else {
@@ -296,16 +305,17 @@ apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
   }
 });
 
+// ========== HELPER FUNCTIONS ==========
 
 // Update project progress based on task completion
 async function updateProjectProgress(projectId, ownerEmail) {
-  const tasks = await getTasks(projectId);
-  const totalTasks = tasks.length;
+  const tasks = await DB.getTasks(projectId);
+  const total = tasks.length;
   const completed = tasks.filter(t => t.completed).length;
   
-  await DB.updateProject(projectId, ownerEmail, {
-    completed: completed,
-    total: total
+  await DB.updateProject(projectId, ownerEmail, { 
+    total: total, 
+    completed: completed 
   });
 }
 
@@ -326,11 +336,11 @@ async function createUser(email, password) {
 // Find a user by field and value
 async function findUser(field, value) {
   if (!value) return null;
-
+  
   if (field === 'token') {
     return DB.getUserByToken(value);
   }
-  return DB.getUser(value)
+  return DB.getUser(value);
 }
 
 // Set authentication cookie
@@ -352,7 +362,6 @@ app.use(function (err, req, res, next) {
 app.use((_req, res) => {
   res.sendFile('index.html', { root: 'public' });
 });
-
 
 app.listen(port, () => {
   console.log(`GroupTask service listening on port ${port}`);
