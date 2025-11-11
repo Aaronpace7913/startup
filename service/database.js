@@ -41,3 +41,38 @@ async function updateUser(user) {
     { $set: user });
 }   
 
+// Additional functions for projects, tasks, messages, and activities can be added here
+
+async function getProjects(ownerEmail) {
+  return cursor = projectCollection.find({ owner: ownerEmail });
+  return cursor.toArray();
+}
+
+async function getProject(projectId, ownerEmail) {
+    return projectCollection.findOne({
+         _id: projectId, 
+         owner: ownerEmail 
+});
+}
+
+async function addProject(project) {
+  return projectCollection.insertOne(project);
+  return project;
+}
+
+async function updateProject(projectId, ownerEmail, updates) {
+    const result = await projectCollection.findOneAndUpdate(
+        { _id: projectId, owner: ownerEmail },
+        { $set: updates },
+        { returnDocument: 'after' }
+    );
+    return result;
+}
+
+async function deleteProject(projectId, ownerEmail) {
+    await projectCollection.deleteOne({
+         _id: projectId, 
+         owner: ownerEmail 
+    });
+}
+
