@@ -1,541 +1,270 @@
-const cookieParser = require('cookie-parser');
-const bcrypt = require('bcryptjs');
-const express = require('express');
-const uuid = require('uuid');
-const app = express();
-const DB = require('./database.js');
+import React from 'react';
+import './projectMembers.css';
 
-const authCookieName = 'token';
+export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
+  const [members, setMembers] = React.useState([]);
+  const [showInviteModal, setShowInviteModal] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState([]);
+  const [selectedUser, setSelectedUser] = React.useState(null);
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [searching, setSearching] = React.useState(false);
 
-const port = process.argv.length > 2 ? process.argv[2] : 4000;
+  const isOwner = currentUserEmail === projectOwner;
 
-app.use(express.json());
-app.use(cookieParser());
-app.use(express.static('public'));
+  // Load members on mount
+  React.useEffect(() => {
+    loadMembers();
+  }, [projectId]);
 
-var apiRouter = express.Router();
-app.use(`/api`, apiRouter);
+  // Search for users as they type
+  React.useEffect(() => {
+    if (searchQuery.length >= 2) {
+      searchUsers();
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
 
-// ========== AUTHENTICATION ENDPOINTS ==========
+  const loadMembers = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members`);
+      if (response.ok) {
+        const data = await response.json();
+        setMembers(data.members || []);
+      } else {
+        console.error('Failed to load members');
+      }
+    } catch (err) {
+      console.error('Error loading members:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-// Create a new user
-apiRouter.post('/auth/create', async (req, res) => {
-  if (await findUser('email', req.body.email)) {
-    res.status(409).send({ msg: 'Existing user' });
-  } else {
-    const user = await createUser(req.body.email, req.body.password);
-    setAuthCookie(res, user.token);
-    res.send({ email: user.email });
-  }
-});
+  const searchUsers = async () => {
+    setSearching(true);
+    try {
+      const response = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`);
+      if (response.ok) {
+        const users = await response.json();
+        // Filter out users who are already members
+        const filteredUsers = users.filter(user => !members.includes(user.email));
+        setSearchResults(filteredUsers);
+      } else {
+        console.error('Failed to search users');
+        setSearchResults([]);
+      }
+    } catch (err) {
+      console.error('Error searching users:', err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
 
-// Login an existing user
-apiRouter.post('/auth/login', async (req, res) => {
-  const user = await findUser('email', req.body.email);
-  if (user) {
-    if (await bcrypt.compare(req.body.password, user.password)) {
-      user.token = uuid.v4();
-      await DB.updateUser(user);
-      setAuthCookie(res, user.token);
-      res.send({ email: user.email });
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    setSearchQuery(user.email);
+    setSearchResults([]);
+  };
+
+  const handleInvite = async () => {
+    setError('');
+    
+    if (!selectedUser && !searchQuery.includes('@')) {
+      setError('Please select a user from the search results');
       return;
     }
-  }
-  res.status(401).send({ msg: 'Unauthorized' });
-});
 
-// Logout a user
-apiRouter.delete('/auth/logout', async (req, res) => {
-  const user = await findUser('token', req.cookies[authCookieName]);
-  if (user) {
-    delete user.token;
-    await DB.updateUser(user);
-  }
-  res.clearCookie(authCookieName);
-  res.status(204).end();
-});
+    const emailToInvite = selectedUser ? selectedUser.email : searchQuery;
 
-// Get current user info
-apiRouter.get('/auth/user', async (req, res) => {
-  const authToken = req.cookies[authCookieName];
-  const user = await findUser('token', authToken);
-  if (user) {
-    res.send({ email: user.email });
-  } else {
-    res.status(401).send({ msg: 'Unauthorized' });
-  }
-});
+    try {
+      const response = await fetch(`/api/projects/${projectId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToInvite })
+      });
 
-// ========== MIDDLEWARE ==========
-
-async function verifyAuth(req, res, next) {
-  const user = await findUser('token', req.cookies[authCookieName]);
-  if (user) {
-    req.user = user;
-    next();
-  } else {
-    res.status(401).send({ msg: 'Unauthorized' });
-  }
-}
-
-// ========== PROJECT ENDPOINTS ==========
-
-// Get all projects for the current user
-apiRouter.get('/projects', verifyAuth, async (req, res) => {
-  const userProjects = await DB.getProjects(req.user.email);
-  res.send(userProjects);
-});
-
-// Create a new project
-apiRouter.post('/projects', verifyAuth, async (req, res) => {
-  const newProject = {
-    id: Date.now(),
-    name: req.body.name,
-    owner: req.user.email,
-    members: [req.user.email], // Owner is automatically a member
-    completed: 0,
-    total: 0,
-    createdAt: new Date().toISOString()
-  };
-  
-  await DB.addProject(newProject);
-  res.send(newProject);
-});
-
-// Get a specific project
-apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    res.send(project);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Update a project
-apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const updatedProject = await DB.updateProject(projectId, req.user.email, req.body);
-  
-  if (updatedProject) {
-    res.send(updatedProject);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Delete a project (owner only)
-apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project && project.owner === req.user.email) {
-    await DB.deleteProject(projectId, req.user.email);
-    await DB.deleteTasksByProject(projectId);
-    await DB.deleteMessagesByProject(projectId);
-    await DB.deleteActivitiesByProject(projectId);
-    res.status(204).end();
-  } else {
-    res.status(403).send({ msg: 'Only the project owner can delete the project' });
-  }
-});
-
-// ========== NEW: MEMBER MANAGEMENT ENDPOINTS ==========
-
-// Get all members of a project
-apiRouter.get('/projects/:id/members', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    res.send({ members: project.members, owner: project.owner });
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Invite a member to a project (owner only)
-apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  const inviteEmail = req.body.email;
-  
-  if (!project) {
-    return res.status(404).send({ msg: 'Project not found' });
-  }
-  
-  if (project.owner !== req.user.email) {
-    return res.status(403).send({ msg: 'Only the project owner can invite members' });
-  }
-  
-  // Check if user exists
-  const invitedUser = await DB.getUser(inviteEmail);
-  if (!invitedUser) {
-    return res.status(404).send({ msg: 'User not found' });
-  }
-  
-  // Check if already a member
-  if (project.members.includes(inviteEmail)) {
-    return res.status(409).send({ msg: 'User is already a member' });
-  }
-  
-  // Create invitation
-  const invitation = {
-    id: Date.now(),
-    projectId: projectId,
-    projectName: project.name,
-    fromEmail: req.user.email,
-    toEmail: inviteEmail,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-  
-  await DB.createInvitation(invitation);
-  res.send({ msg: 'Invitation sent', invitation });
-});
-
-// Get all invitations for current user
-apiRouter.get('/invitations', verifyAuth, async (req, res) => {
-  const invitations = await DB.getInvitations(req.user.email);
-  res.send(invitations);
-});
-
-// Accept an invitation
-apiRouter.post('/invitations/:id/accept', verifyAuth, async (req, res) => {
-  const invitationId = parseInt(req.params.id);
-  const invitations = await DB.getInvitations(req.user.email);
-  const invitation = invitations.find(inv => inv.id === invitationId);
-  
-  if (!invitation) {
-    return res.status(404).send({ msg: 'Invitation not found' });
-  }
-  
-  if (invitation.toEmail !== req.user.email) {
-    return res.status(403).send({ msg: 'This invitation is not for you' });
-  }
-  
-  // Add user to project
-  const project = await DB.getProject(invitation.projectId, invitation.fromEmail);
-  if (!project) {
-    return res.status(404).send({ msg: 'Project no longer exists' });
-  }
-  
-  await DB.addProjectMember(invitation.projectId, project.owner, req.user.email);
-  await DB.updateInvitation(invitationId, 'accepted');
-  
-  // Add activity
-  await DB.addActivity({
-    id: Date.now(),
-    projectId: invitation.projectId,
-    user: req.user.email,
-    action: 'joined the project',
-    timestamp: new Date().toISOString()
-  });
-  
-  res.send({ msg: 'Invitation accepted', project });
-});
-
-// Decline an invitation
-apiRouter.post('/invitations/:id/decline', verifyAuth, async (req, res) => {
-  const invitationId = parseInt(req.params.id);
-  const invitations = await DB.getInvitations(req.user.email);
-  const invitation = invitations.find(inv => inv.id === invitationId);
-  
-  if (!invitation) {
-    return res.status(404).send({ msg: 'Invitation not found' });
-  }
-  
-  if (invitation.toEmail !== req.user.email) {
-    return res.status(403).send({ msg: 'This invitation is not for you' });
-  }
-  
-  await DB.updateInvitation(invitationId, 'declined');
-  res.send({ msg: 'Invitation declined' });
-});
-
-// Remove a member from a project (owner only)
-apiRouter.delete('/projects/:id/members/:email', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const memberEmail = req.params.email;
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (!project) {
-    return res.status(404).send({ msg: 'Project not found' });
-  }
-  
-  if (project.owner !== req.user.email) {
-    return res.status(403).send({ msg: 'Only the project owner can remove members' });
-  }
-  
-  if (memberEmail === project.owner) {
-    return res.status(400).send({ msg: 'Cannot remove the project owner' });
-  }
-  
-  await DB.removeProjectMember(projectId, req.user.email, memberEmail);
-  
-  // Add activity
-  await DB.addActivity({
-    id: Date.now(),
-    projectId: projectId,
-    user: req.user.email,
-    action: `removed ${memberEmail} from the project`,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.send({ msg: 'Member removed' });
-});
-
-// Leave a project (member only, not owner)
-apiRouter.post('/projects/:id/leave', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (!project) {
-    return res.status(404).send({ msg: 'Project not found' });
-  }
-  
-  if (project.owner === req.user.email) {
-    return res.status(400).send({ msg: 'Project owner cannot leave. Delete the project instead.' });
-  }
-  
-  await DB.removeProjectMember(projectId, project.owner, req.user.email);
-  
-  // Add activity
-  await DB.addActivity({
-    id: Date.now(),
-    projectId: projectId,
-    user: req.user.email,
-    action: 'left the project',
-    timestamp: new Date().toISOString()
-  });
-  
-  res.send({ msg: 'You have left the project' });
-});
-
-// ========== TASK ENDPOINTS ==========
-
-// Get all tasks for a project
-apiRouter.get('/projects/:id/tasks', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const tasks = await DB.getTasks(projectId);
-    res.send(tasks);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Create a new task
-apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const newTask = {
-      id: Date.now(),
-      projectId: projectId,
-      text: req.body.text,
-      assignedTo: req.body.assignedTo || '',
-      completed: false,
-      createdAt: new Date().toISOString()
-    };
-    
-    await DB.addTask(newTask);
-    await updateProjectProgress(projectId, req.user.email);
-    
-    res.send(newTask);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Update a task
-apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.projectId);
-  const taskId = parseInt(req.params.taskId);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const updatedTask = await DB.updateTask(projectId, taskId, req.body);
-    if (updatedTask) {
-      await updateProjectProgress(projectId, req.user.email);
-      res.send(updatedTask);
-    } else {
-      res.status(404).send({ msg: 'Task not found' });
+      if (response.ok) {
+        alert(`Invitation sent to ${emailToInvite}!`);
+        setSearchQuery('');
+        setSelectedUser(null);
+        setShowInviteModal(false);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.msg || 'Failed to send invitation');
+      }
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      setError('Network error. Please try again.');
     }
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Delete a task
-apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.projectId);
-  const taskId = parseInt(req.params.taskId);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    await DB.deleteTask(projectId, taskId);
-    await updateProjectProgress(projectId, req.user.email);
-    res.status(204).end();
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// ========== MESSAGE ENDPOINTS ==========
-
-// Get all chat messages for a project
-apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const messages = await DB.getMessages(projectId);
-    res.send(messages);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Post a new chat message
-apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const newMessage = {
-      id: Date.now(),
-      projectId: projectId,
-      user: req.body.user,
-      text: req.body.text,
-      timestamp: new Date().toISOString()
-    };
-    
-    await DB.addMessage(newMessage);
-    res.send(newMessage);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// Global messages endpoints (for the general chat page)
-apiRouter.get('/messages', verifyAuth, async (req, res) => {
-  const messages = await DB.getMessages('global');
-  res.send(messages);
-});
-
-apiRouter.post('/messages', verifyAuth, async (req, res) => {
-  const newMessage = {
-    id: Date.now(),
-    projectId: 'global',
-    user: req.body.user,
-    text: req.body.text,
-    timestamp: new Date().toISOString()
   };
-  
-  await DB.addMessage(newMessage);
-  res.send(newMessage);
-});
 
-// ========== ACTIVITY ENDPOINTS ==========
+  const handleRemoveMember = async (memberEmail) => {
+    if (!window.confirm(`Remove ${memberEmail} from this project?`)) {
+      return;
+    }
 
-// Get activities for a project
-apiRouter.get('/projects/:id/activities', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const activities = await DB.getActivities(projectId);
-    res.send(activities);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members/${encodeURIComponent(memberEmail)}`, {
+        method: 'DELETE'
+      });
 
-// Post a new activity
-apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  
-  if (project) {
-    const newActivity = {
-      id: Date.now(),
-      projectId: projectId,
-      user: req.body.user,
-      action: req.body.action,
-      timestamp: new Date().toISOString()
-    };
-    
-    await DB.addActivity(newActivity);
-    res.send(newActivity);
-  } else {
-    res.status(404).send({ msg: 'Project not found' });
-  }
-});
-
-// ========== HELPER FUNCTIONS ==========
-
-// Update project progress based on task completion
-async function updateProjectProgress(projectId, ownerEmail) {
-  const tasks = await DB.getTasks(projectId);
-  const total = tasks.length;
-  const completed = tasks.filter(t => t.completed).length;
-  
-  await DB.updateProject(projectId, ownerEmail, { 
-    total: total, 
-    completed: completed 
-  });
-}
-
-// Create a new user
-async function createUser(email, password) {
-  const passwordHash = await bcrypt.hash(password, 10);
-  
-  const user = {
-    email: email,
-    password: passwordHash,
-    token: uuid.v4(),
+      if (response.ok) {
+        setMembers(members.filter(m => m !== memberEmail));
+        alert(`${memberEmail} has been removed from the project`);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.msg || 'Failed to remove member');
+      }
+    } catch (err) {
+      console.error('Error removing member:', err);
+      alert('Network error. Please try again.');
+    }
   };
-  await DB.addUser(user);
-  
-  return user;
-}
 
-// Find a user by field and value
-async function findUser(field, value) {
-  if (!value) return null;
-  
-  if (field === 'token') {
-    return DB.getUserByToken(value);
+  const handleLeaveProject = async () => {
+    if (!window.confirm('Are you sure you want to leave this project?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/leave`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        alert('You have left the project');
+        window.location.href = '/dashboard';
+      } else {
+        const errorData = await response.json();
+        alert(errorData.msg || 'Failed to leave project');
+      }
+    } catch (err) {
+      console.error('Error leaving project:', err);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  if (loading) {
+    return <div className="members-loading">Loading members...</div>;
   }
-  return DB.getUser(value);
+
+  return (
+    <div className="project-members-container">
+      <div className="members-header">
+        <h3>👥 Project Members ({members.length})</h3>
+        {isOwner && (
+          <button 
+            className="btn-invite"
+            onClick={() => setShowInviteModal(true)}
+          >
+            + Invite Member
+          </button>
+        )}
+        {!isOwner && (
+          <button 
+            className="btn-leave"
+            onClick={handleLeaveProject}
+          >
+            Leave Project
+          </button>
+        )}
+      </div>
+
+      <div className="members-list">
+        {members.map((memberEmail) => (
+          <div key={memberEmail} className="member-item">
+            <div className="member-info">
+              <span className="member-icon">👤</span>
+              <span className="member-email">{memberEmail}</span>
+              {memberEmail === projectOwner && (
+                <span className="owner-badge">Owner</span>
+              )}
+            </div>
+            {isOwner && memberEmail !== projectOwner && (
+              <button
+                className="btn-remove"
+                onClick={() => handleRemoveMember(memberEmail)}
+                title="Remove member"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Invite Modal with Search */}
+      {showInviteModal && (
+        <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+          <div className="modal-content modal-search" onClick={(e) => e.stopPropagation()}>
+            <h3>Invite Member to Project</h3>
+            {error && <div className="error-message">{error}</div>}
+            
+            <div className="search-container">
+              <input
+                type="text"
+                placeholder="Search by name or email (min 2 characters)"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSelectedUser(null);
+                }}
+                autoFocus
+              />
+              {searching && <div className="search-loading">Searching...</div>}
+              
+              {searchResults.length > 0 && (
+                <div className="search-results">
+                  {searchResults.map((user) => (
+                    <div 
+                      key={user.email}
+                      className="search-result-item"
+                      onClick={() => handleSelectUser(user)}
+                    >
+                      <span className="result-icon">👤</span>
+                      <div className="result-info">
+                        <div className="result-email">{user.email}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
+                <div className="no-results">
+                  No users found. You can still invite by email.
+                </div>
+              )}
+            </div>
+
+            <div className="modal-buttons">
+              <button 
+                className="btn-cancel" 
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setError('');
+                  setSearchQuery('');
+                  setSelectedUser(null);
+                  setSearchResults([]);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-create" 
+                onClick={handleInvite}
+                disabled={!searchQuery.trim()}
+              >
+                Send Invitation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
-
-// Set authentication cookie
-function setAuthCookie(res, authToken) {
-  res.cookie(authCookieName, authToken, {
-    maxAge: 1000 * 60 * 60 * 24 * 365,
-    secure: true,
-    httpOnly: true,
-    sameSite: 'strict',
-  });
-}
-
-// Default error handler
-app.use(function (err, req, res, next) {
-  res.status(500).send({ type: err.name, message: err.message });
-});
-
-// Return the application's default page if the path is unknown
-app.use((_req, res) => {
-  res.sendFile('index.html', { root: 'public' });
-});
-
-app.listen(port, () => {
-  console.log(`GroupTask service listening on port ${port}`);
-});
