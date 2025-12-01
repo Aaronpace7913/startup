@@ -92,6 +92,7 @@ apiRouter.post('/projects', verifyAuth, async (req, res) => {
     id: Date.now(),
     name: req.body.name,
     owner: req.user.email,
+    members: [req.user.email], // Owner is automatically a member
     completed: 0,
     total: 0,
     createdAt: new Date().toISOString()
@@ -125,20 +126,192 @@ apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
   }
 });
 
-// Delete a project
+// Delete a project (owner only)
 apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
   
-  if (project) {
+  if (project && project.owner === req.user.email) {
     await DB.deleteProject(projectId, req.user.email);
     await DB.deleteTasksByProject(projectId);
     await DB.deleteMessagesByProject(projectId);
     await DB.deleteActivitiesByProject(projectId);
     res.status(204).end();
   } else {
+    res.status(403).send({ msg: 'Only the project owner can delete the project' });
+  }
+});
+
+// ========== NEW: MEMBER MANAGEMENT ENDPOINTS ==========
+
+// Get all members of a project
+apiRouter.get('/projects/:id/members', verifyAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = await DB.getProject(projectId, req.user.email);
+  
+  if (project) {
+    res.send({ members: project.members, owner: project.owner });
+  } else {
     res.status(404).send({ msg: 'Project not found' });
   }
+});
+
+// Invite a member to a project (owner only)
+apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = await DB.getProject(projectId, req.user.email);
+  const inviteEmail = req.body.email;
+  
+  if (!project) {
+    return res.status(404).send({ msg: 'Project not found' });
+  }
+  
+  if (project.owner !== req.user.email) {
+    return res.status(403).send({ msg: 'Only the project owner can invite members' });
+  }
+  
+  // Check if user exists
+  const invitedUser = await DB.getUser(inviteEmail);
+  if (!invitedUser) {
+    return res.status(404).send({ msg: 'User not found' });
+  }
+  
+  // Check if already a member
+  if (project.members.includes(inviteEmail)) {
+    return res.status(409).send({ msg: 'User is already a member' });
+  }
+  
+  // Create invitation
+  const invitation = {
+    id: Date.now(),
+    projectId: projectId,
+    projectName: project.name,
+    fromEmail: req.user.email,
+    toEmail: inviteEmail,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+  
+  await DB.createInvitation(invitation);
+  res.send({ msg: 'Invitation sent', invitation });
+});
+
+// Get all invitations for current user
+apiRouter.get('/invitations', verifyAuth, async (req, res) => {
+  const invitations = await DB.getInvitations(req.user.email);
+  res.send(invitations);
+});
+
+// Accept an invitation
+apiRouter.post('/invitations/:id/accept', verifyAuth, async (req, res) => {
+  const invitationId = parseInt(req.params.id);
+  const invitations = await DB.getInvitations(req.user.email);
+  const invitation = invitations.find(inv => inv.id === invitationId);
+  
+  if (!invitation) {
+    return res.status(404).send({ msg: 'Invitation not found' });
+  }
+  
+  if (invitation.toEmail !== req.user.email) {
+    return res.status(403).send({ msg: 'This invitation is not for you' });
+  }
+  
+  // Add user to project
+  const project = await DB.getProject(invitation.projectId, invitation.fromEmail);
+  if (!project) {
+    return res.status(404).send({ msg: 'Project no longer exists' });
+  }
+  
+  await DB.addProjectMember(invitation.projectId, project.owner, req.user.email);
+  await DB.updateInvitation(invitationId, 'accepted');
+  
+  // Add activity
+  await DB.addActivity({
+    id: Date.now(),
+    projectId: invitation.projectId,
+    user: req.user.email,
+    action: 'joined the project',
+    timestamp: new Date().toISOString()
+  });
+  
+  res.send({ msg: 'Invitation accepted', project });
+});
+
+// Decline an invitation
+apiRouter.post('/invitations/:id/decline', verifyAuth, async (req, res) => {
+  const invitationId = parseInt(req.params.id);
+  const invitations = await DB.getInvitations(req.user.email);
+  const invitation = invitations.find(inv => inv.id === invitationId);
+  
+  if (!invitation) {
+    return res.status(404).send({ msg: 'Invitation not found' });
+  }
+  
+  if (invitation.toEmail !== req.user.email) {
+    return res.status(403).send({ msg: 'This invitation is not for you' });
+  }
+  
+  await DB.updateInvitation(invitationId, 'declined');
+  res.send({ msg: 'Invitation declined' });
+});
+
+// Remove a member from a project (owner only)
+apiRouter.delete('/projects/:id/members/:email', verifyAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const memberEmail = req.params.email;
+  const project = await DB.getProject(projectId, req.user.email);
+  
+  if (!project) {
+    return res.status(404).send({ msg: 'Project not found' });
+  }
+  
+  if (project.owner !== req.user.email) {
+    return res.status(403).send({ msg: 'Only the project owner can remove members' });
+  }
+  
+  if (memberEmail === project.owner) {
+    return res.status(400).send({ msg: 'Cannot remove the project owner' });
+  }
+  
+  await DB.removeProjectMember(projectId, req.user.email, memberEmail);
+  
+  // Add activity
+  await DB.addActivity({
+    id: Date.now(),
+    projectId: projectId,
+    user: req.user.email,
+    action: `removed ${memberEmail} from the project`,
+    timestamp: new Date().toISOString()
+  });
+  
+  res.send({ msg: 'Member removed' });
+});
+
+// Leave a project (member only, not owner)
+apiRouter.post('/projects/:id/leave', verifyAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = await DB.getProject(projectId, req.user.email);
+  
+  if (!project) {
+    return res.status(404).send({ msg: 'Project not found' });
+  }
+  
+  if (project.owner === req.user.email) {
+    return res.status(400).send({ msg: 'Project owner cannot leave. Delete the project instead.' });
+  }
+  
+  await DB.removeProjectMember(projectId, project.owner, req.user.email);
+  
+  // Add activity
+  await DB.addActivity({
+    id: Date.now(),
+    projectId: projectId,
+    user: req.user.email,
+    action: 'left the project',
+    timestamp: new Date().toISOString()
+  });
+  
+  res.send({ msg: 'You have left the project' });
 });
 
 // ========== TASK ENDPOINTS ==========
@@ -250,7 +423,7 @@ apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
   }
 });
 
-// Global messages endpoints
+// Global messages endpoints (for the general chat page)
 apiRouter.get('/messages', verifyAuth, async (req, res) => {
   const messages = await DB.getMessages('global');
   res.send(messages);
