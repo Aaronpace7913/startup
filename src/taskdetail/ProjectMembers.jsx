@@ -201,6 +201,18 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
       {showInviteModal && (
         <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
           <div className="modal-content modal-search" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="modal-close"
+              onClick={() => {
+                setShowInviteModal(false);
+                setError('');
+                setSearchQuery('');
+                setSelectedUser(null);
+                setSearchResults([]);
+              }}
+            >
+              ✕
+            </button>
             <h3>Invite Member to Project</h3>
             {error && <div className="error-message">{error}</div>}
             
