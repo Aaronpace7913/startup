@@ -11,7 +11,7 @@ const projectCollection = db.collection('project');
 const taskCollection = db.collection('task');
 const messageCollection = db.collection('message');
 const activityCollection = db.collection('activity');
-const invitationCollection = db.collection('invitation');
+const invitationCollection = db.collection('invitation'); // NEW
 
 // Test the connection
 (async function testConnection() {
@@ -44,7 +44,17 @@ async function updateUser(user) {
   );
 }
 
+// NEW: Search users by email (case-insensitive)
+async function searchUsers(query) {
+  const regex = new RegExp(query, 'i'); // Case-insensitive search
+  const cursor = userCollection
+    .find({ email: regex })
+    .limit(10); // Limit results to 10
+  return cursor.toArray();
+}
+
 // ========== PROJECT FUNCTIONS ==========
+// UPDATED: Now returns projects where user is owner OR member
 async function getProjects(userEmail) {
   const cursor = projectCollection.find({ 
     $or: [
@@ -230,6 +240,7 @@ module.exports = {
   getUserByToken,
   addUser,
   updateUser,
+  searchUsers,              // NEW
   
   // Project functions
   getProjects,
@@ -237,15 +248,15 @@ module.exports = {
   addProject,
   updateProject,
   deleteProject,
-  addProjectMember,           // NEW
-  removeProjectMember,        // NEW
-  getProjectMembers,          // NEW
+  addProjectMember,
+  removeProjectMember,
+  getProjectMembers,
   
   // Invitation functions
-  createInvitation,           // NEW
-  getInvitations,             // NEW
-  updateInvitation,           // NEW
-  deleteInvitation,           // NEW
+  createInvitation,
+  getInvitations,
+  updateInvitation,
+  deleteInvitation,
   
   // Task functions
   getTasks,
