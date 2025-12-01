@@ -1,6 +1,7 @@
 import React from 'react';
 import './dashboard.css';
 import { Link } from 'react-router-dom';
+import { Invitations } from '../invitations/Invitations'; // NEW IMPORT
 
 export function Dashboard() {
   const [projects, setProjects] = React.useState([]);
@@ -82,6 +83,11 @@ export function Dashboard() {
     return (completed / total) * 100;
   };
 
+  // NEW: Callback when invitation is accepted
+  const handleInvitationAccepted = () => {
+    loadProjects(); // Refresh projects list
+  };
+
   if (loading) {
     return (
       <main>
@@ -95,6 +101,9 @@ export function Dashboard() {
   return (
     <main>
       <div className="container">
+        {/* NEW: Invitations Component */}
+        <Invitations onInvitationAccepted={handleInvitationAccepted} />
+
         <div className="dashboard-header">
           <h2>My Projects</h2>
           <button className="new-project-btn" onClick={() => setShowModal(true)}>
