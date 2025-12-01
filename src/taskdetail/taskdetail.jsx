@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
+import { ProjectMembers } from './ProjectMembers'; // NEW IMPORT
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
@@ -65,7 +66,7 @@ export function Taskdetail({ userName }) {
           setTasks([...tasks, newTask]);
           
           // Add activity
-          await addActivity(`You added new task "${newTaskText}"`);
+          await addActivity(`added new task "${newTaskText}"`);
           
           setNewTaskText('');
           setShowModal(false);
@@ -99,8 +100,8 @@ export function Taskdetail({ userName }) {
         
         // Add activity
         const activityMessage = newCompleted 
-          ? `You completed "${task.text}"`
-          : `You uncompleted "${task.text}"`;
+          ? `completed "${task.text}"`
+          : `uncompleted "${task.text}"`;
         await addActivity(activityMessage);
         
         // Reload project to get updated progress
@@ -126,7 +127,7 @@ export function Taskdetail({ userName }) {
         setTasks(tasks.filter(t => t.id !== task.id));
         
         // Add activity
-        await addActivity(`You deleted "${task.text}"`);
+        await addActivity(`deleted "${task.text}"`);
         
         // Reload project to get updated progress
         await loadProject();
@@ -213,6 +214,13 @@ export function Taskdetail({ userName }) {
   return (
     <main>
       <div id="task-and-chat-container">
+        {/* NEW: Project Members Component */}
+        <ProjectMembers 
+          projectId={parseInt(projectId)}
+          projectOwner={project.owner}
+          currentUserEmail={userName}
+        />
+
         <section id="tasks">
           <div className="task-header">
             <div>
