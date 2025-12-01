@@ -48,7 +48,12 @@ async function updateUser(user) {
 async function searchUsers(query) {
   const regex = new RegExp(query, 'i'); // Case-insensitive search
   const cursor = userCollection
-    .find({ email: regex })
+    .find({ 
+      $or: [
+        { email: regex },
+        { username: regex }  // Also search by username if it exists
+      ]
+    })
     .limit(10); // Limit results to 10
   return cursor.toArray();
 }
