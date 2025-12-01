@@ -11,6 +11,7 @@ const projectCollection = db.collection('project');
 const taskCollection = db.collection('task');
 const messageCollection = db.collection('message');
 const activityCollection = db.collection('activity');
+const invitationCollection = db.collection('invitation');
 
 // Test the connection
 (async function testConnection() {
@@ -44,37 +45,118 @@ async function updateUser(user) {
 }
 
 // ========== PROJECT FUNCTIONS ==========
-async function getProjects(ownerEmail) {
-  const cursor = projectCollection.find({ owner: ownerEmail });
+async function getProjects(userEmail) {
+  const cursor = projectCollection.find({ 
+    $or: [
+      { owner: userEmail },
+      { members: userEmail }
+    ]
+  });
   return cursor.toArray();
 }
 
-async function getProject(projectId, ownerEmail) {
+// UPDATED: Check if user is owner OR member
+async function getProject(projectId, userEmail) {
   return projectCollection.findOne({ 
-    id: projectId, 
-    owner: ownerEmail 
+    id: projectId,
+    $or: [
+      { owner: userEmail },
+      { members: userEmail }
+    ]
   });
 }
 
+// UPDATED: Initialize with members array containing just the owner
 async function addProject(project) {
+  project.members = project.members || [project.owner]; // Owner is always a member
   await projectCollection.insertOne(project);
   return project;
 }
 
-async function updateProject(projectId, ownerEmail, updates) {
+async function updateProject(projectId, userEmail, updates) {
   const result = await projectCollection.findOneAndUpdate(
-    { id: projectId, owner: ownerEmail },
+    { 
+      id: projectId,
+      $or: [
+        { owner: userEmail },
+        { members: userEmail }
+      ]
+    },
     { $set: updates },
     { returnDocument: 'after' }
   );
   return result;
 }
 
+// Only owner can delete
 async function deleteProject(projectId, ownerEmail) {
   await projectCollection.deleteOne({ 
     id: projectId, 
     owner: ownerEmail 
   });
+}
+
+// NEW: Add a member to a project
+async function addProjectMember(projectId, ownerEmail, memberEmail) {
+  const result = await projectCollection.findOneAndUpdate(
+    { id: projectId, owner: ownerEmail },
+    { $addToSet: { members: memberEmail } }, // $addToSet prevents duplicates
+    { returnDocument: 'after' }
+  );
+  return result;
+}
+
+// NEW: Remove a member from a project
+async function removeProjectMember(projectId, ownerEmail, memberEmail) {
+  const result = await projectCollection.findOneAndUpdate(
+    { id: projectId, owner: ownerEmail },
+    { $pull: { members: memberEmail } },
+    { returnDocument: 'after' }
+  );
+  return result;
+}
+
+// NEW: Get all members of a project
+async function getProjectMembers(projectId, userEmail) {
+  const project = await projectCollection.findOne({
+    id: projectId,
+    $or: [
+      { owner: userEmail },
+      { members: userEmail }
+    ]
+  });
+  return project ? project.members : null;
+}
+
+// ========== INVITATION FUNCTIONS ==========
+// NEW: Create an invitation
+async function createInvitation(invitation) {
+  await invitationCollection.insertOne(invitation);
+  return invitation;
+}
+
+// NEW: Get invitations for a user
+async function getInvitations(userEmail) {
+  const cursor = invitationCollection.find({ 
+    toEmail: userEmail,
+    status: 'pending'
+  }).sort({ createdAt: -1 });
+  return cursor.toArray();
+}
+
+// NEW: Update invitation status
+async function updateInvitation(invitationId, status) {
+  const result = await invitationCollection.findOneAndUpdate(
+    { id: invitationId },
+    { $set: { status: status } },
+    { returnDocument: 'after' }
+  );
+  return result;
+}
+
+// NEW: Delete invitation
+async function deleteInvitation(invitationId) {
+  await invitationCollection.deleteOne({ id: invitationId });
 }
 
 // ========== TASK FUNCTIONS ==========
@@ -155,6 +237,15 @@ module.exports = {
   addProject,
   updateProject,
   deleteProject,
+  addProjectMember,           // NEW
+  removeProjectMember,        // NEW
+  getProjectMembers,          // NEW
+  
+  // Invitation functions
+  createInvitation,           // NEW
+  getInvitations,             // NEW
+  updateInvitation,           // NEW
+  deleteInvitation,           // NEW
   
   // Task functions
   getTasks,
