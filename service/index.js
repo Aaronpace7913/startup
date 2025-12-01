@@ -82,20 +82,24 @@ async function verifyAuth(req, res, next) {
 
 // Search for users by email (for invitations)
 apiRouter.get('/users/search', verifyAuth, async (req, res) => {
-  const query = req.query.q;
-  
-  if (!query || query.length < 2) {
-    return res.status(400).send({ msg: 'Query must be at least 2 characters' });
-  }
-  
   try {
+    const query = req.query.q;
+    
+    if (!query || query.length < 2) {
+      return res.status(400).send({ msg: 'Query must be at least 2 characters' });
+    }
+    
+    console.log(`Searching for users with query: ${query}`);
+    
     const users = await DB.searchUsers(query);
+    console.log(`Found ${users.length} users`);
+    
     // Return email only (no sensitive data)
     const results = users.map(user => ({ email: user.email }));
     res.send(results);
   } catch (err) {
     console.error('Error searching users:', err);
-    res.status(500).send({ msg: 'Search failed' });
+    res.status(500).send({ msg: 'Search failed', error: err.message });
   }
 });
 
@@ -179,42 +183,65 @@ apiRouter.get('/projects/:id/members', verifyAuth, async (req, res) => {
 
 // Invite a member to a project (owner only)
 apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
-  const projectId = parseInt(req.params.id);
-  const project = await DB.getProject(projectId, req.user.email);
-  const inviteEmail = req.body.email;
-  
-  if (!project) {
-    return res.status(404).send({ msg: 'Project not found' });
+  try {
+    const projectId = parseInt(req.params.id);
+    const inviteEmail = req.body.email;
+    
+    console.log(`Attempting to invite ${inviteEmail} to project ${projectId}`);
+    
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      return res.status(400).send({ msg: 'Invalid email address' });
+    }
+    
+    const project = await DB.getProject(projectId, req.user.email);
+    
+    if (!project) {
+      return res.status(404).send({ msg: 'Project not found' });
+    }
+    
+    if (project.owner !== req.user.email) {
+      return res.status(403).send({ msg: 'Only the project owner can invite members' });
+    }
+    
+    // Check if user exists
+    const invitedUser = await DB.getUser(inviteEmail);
+    if (!invitedUser) {
+      return res.status(404).send({ msg: `User with email ${inviteEmail} not found. They need to create an account first.` });
+    }
+    
+    // Check if already a member
+    if (project.members && project.members.includes(inviteEmail)) {
+      return res.status(409).send({ msg: 'User is already a member' });
+    }
+    
+    // Check if invitation already exists
+    const existingInvitations = await DB.getInvitations(inviteEmail);
+    const alreadyInvited = existingInvitations.some(
+      inv => inv.projectId === projectId && inv.status === 'pending'
+    );
+    
+    if (alreadyInvited) {
+      return res.status(409).send({ msg: 'User has already been invited to this project' });
+    }
+    
+    // Create invitation
+    const invitation = {
+      id: Date.now(),
+      projectId: projectId,
+      projectName: project.name,
+      fromEmail: req.user.email,
+      toEmail: inviteEmail,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    
+    await DB.createInvitation(invitation);
+    console.log(`Invitation created successfully for ${inviteEmail}`);
+    res.send({ msg: 'Invitation sent', invitation });
+  } catch (err) {
+    console.error('Error in invite endpoint:', err);
+    res.status(500).send({ msg: 'Server error while sending invitation', error: err.message });
   }
-  
-  if (project.owner !== req.user.email) {
-    return res.status(403).send({ msg: 'Only the project owner can invite members' });
-  }
-  
-  // Check if user exists
-  const invitedUser = await DB.getUser(inviteEmail);
-  if (!invitedUser) {
-    return res.status(404).send({ msg: 'User not found' });
-  }
-  
-  // Check if already a member
-  if (project.members.includes(inviteEmail)) {
-    return res.status(409).send({ msg: 'User is already a member' });
-  }
-  
-  // Create invitation
-  const invitation = {
-    id: Date.now(),
-    projectId: projectId,
-    projectName: project.name,
-    fromEmail: req.user.email,
-    toEmail: inviteEmail,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-  
-  await DB.createInvitation(invitation);
-  res.send({ msg: 'Invitation sent', invitation });
 });
 
 // Get all invitations for current user
