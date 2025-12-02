@@ -3,7 +3,7 @@ import './dashboard.css';
 import { Link } from 'react-router-dom';
 import { Invitations } from '../invitations/Invitations'; // NEW IMPORT
 
-export function Dashboard() {
+export function Dashboard({userName}) {
   const [projects, setProjects] = React.useState([]);
   const [showModal, setShowModal] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState('');

@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
 import { ProjectMembers } from './ProjectMembers';
-import { useWebSocket } from './hooks/useWebSocket';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
@@ -31,7 +31,13 @@ export function Taskdetail({ userName }) {
 
     switch (lastMessage.type) {
       case 'task-created':
-        setTasks(prev => [...prev, lastMessage.task]);
+        setTasks(prev => {
+          // Avoid duplicates
+          if (prev.find(t => t.id === lastMessage.task.id)) {
+            return prev;
+          }
+          return [...prev, lastMessage.task];
+        });
         if (lastMessage.project) {
           setProject(lastMessage.project);
         }
@@ -54,19 +60,33 @@ export function Taskdetail({ userName }) {
         break;
 
       case 'new-activity':
-        setActivities(prev => [lastMessage.activity, ...prev]);
+        setActivities(prev => {
+          // Avoid duplicates
+          if (prev.find(a => a.id === lastMessage.activity.id)) {
+            return prev;
+          }
+          return [lastMessage.activity, ...prev];
+        });
         break;
 
       case 'member-joined':
-        setActivities(prev => [lastMessage.activity, ...prev]);
-        // Reload project to get updated member list
+        setActivities(prev => {
+          if (prev.find(a => a.id === lastMessage.activity.id)) {
+            return prev;
+          }
+          return [lastMessage.activity, ...prev];
+        });
         loadProject();
         break;
 
       case 'member-removed':
       case 'member-left':
-        setActivities(prev => [lastMessage.activity, ...prev]);
-        // Reload project to get updated member list
+        setActivities(prev => {
+          if (prev.find(a => a.id === lastMessage.activity.id)) {
+            return prev;
+          }
+          return [lastMessage.activity, ...prev];
+        });
         loadProject();
         break;
 
