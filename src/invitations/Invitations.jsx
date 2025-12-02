@@ -1,13 +1,32 @@
 import React from 'react';
 import './invitations.css';
+import { useWebSocket } from './hooks/useWebSocket';
 
-export function Invitations({ onInvitationAccepted }) {
+export function Invitations({ onInvitationAccepted, userEmail }) {
   const [invitations, setInvitations] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+
+  // WebSocket connection for receiving invitations
+  const { lastMessage } = useWebSocket(null, userEmail);
 
   React.useEffect(() => {
     loadInvitations();
   }, []);
+
+  // Handle WebSocket messages
+  React.useEffect(() => {
+    if (!lastMessage) return;
+
+    if (lastMessage.type === 'new-invitation') {
+      setInvitations(prev => {
+        // Avoid duplicates
+        if (prev.find(inv => inv.id === lastMessage.invitation.id)) {
+          return prev;
+        }
+        return [lastMessage.invitation, ...prev];
+      });
+    }
+  }, [lastMessage]);
 
   const loadInvitations = async () => {
     try {
@@ -36,7 +55,6 @@ export function Invitations({ onInvitationAccepted }) {
         alert(`You've joined ${data.project.name}!`);
         setInvitations(invitations.filter(inv => inv.id !== invitationId));
         
-        // Notify parent component to refresh projects
         if (onInvitationAccepted) {
           onInvitationAccepted();
         }
@@ -90,11 +108,11 @@ export function Invitations({ onInvitationAccepted }) {
   };
 
   if (loading) {
-    return null; // Don't show anything while loading
+    return null;
   }
 
   if (invitations.length === 0) {
-    return null; // Don't show the section if no invitations
+    return null;
   }
 
   return (
