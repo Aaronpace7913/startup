@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
 import { ProjectMembers } from './ProjectMembers';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../hooks/useWebsocket';
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
@@ -31,42 +31,50 @@ export function Taskdetail({ userName }) {
 
     switch (lastMessage.type) {
       case 'task-created':
-        setTasks(prev => {
-          // Avoid duplicates
-          if (prev.find(t => t.id === lastMessage.task.id)) {
-            return prev;
+        if (lastMessage.task) {
+          setTasks(prev => {
+            // Avoid duplicates by checking if task already exists
+            if (prev.find(t => t.id === lastMessage.task.id)) {
+              return prev;
+            }
+            return [...prev, lastMessage.task];
+          });
+          if (lastMessage.project) {
+            setProject(lastMessage.project);
           }
-          return [...prev, lastMessage.task];
-        });
-        if (lastMessage.project) {
-          setProject(lastMessage.project);
         }
         break;
 
       case 'task-updated':
-        setTasks(prev => prev.map(t => 
-          t.id === lastMessage.task.id ? lastMessage.task : t
-        ));
-        if (lastMessage.project) {
-          setProject(lastMessage.project);
+        if (lastMessage.task) {
+          setTasks(prev => prev.map(t => 
+            t.id === lastMessage.task.id ? lastMessage.task : t
+          ));
+          if (lastMessage.project) {
+            setProject(lastMessage.project);
+          }
         }
         break;
 
       case 'task-deleted':
-        setTasks(prev => prev.filter(t => t.id !== lastMessage.taskId));
-        if (lastMessage.project) {
-          setProject(lastMessage.project);
+        if (lastMessage.taskId) {
+          setTasks(prev => prev.filter(t => t.id !== lastMessage.taskId));
+          if (lastMessage.project) {
+            setProject(lastMessage.project);
+          }
         }
         break;
 
       case 'new-activity':
-        setActivities(prev => {
-          // Avoid duplicates
-          if (prev.find(a => a.id === lastMessage.activity.id)) {
-            return prev;
-          }
-          return [lastMessage.activity, ...prev];
-        });
+        if (lastMessage.activity) {
+          setActivities(prev => {
+            // Avoid duplicates
+            if (prev.find(a => a.id === lastMessage.activity.id)) {
+              return prev;
+            }
+            return [lastMessage.activity, ...prev];
+          });
+        }
         break;
 
       case 'member-joined':
@@ -144,25 +152,31 @@ export function Taskdetail({ userName }) {
   };
 
   const handleAddTask = async () => {
-    if (newTaskText.trim()) {
-      try {
-        const response = await fetch(`/api/projects/${projectId}/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: newTaskText })
-        });
+    if (!newTaskText.trim()) {
+      alert('Please enter a task description');
+      return;
+    }
 
-        if (response.ok) {
-          await addActivity(`added new task "${newTaskText}"`);
-          setNewTaskText('');
-          setShowModal(false);
-        } else {
-          alert('Failed to create task. Please try again.');
-        }
-      } catch (err) {
-        console.error('Error creating task:', err);
-        alert('Error creating task. Please try again.');
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newTaskText })
+      });
+
+      if (response.ok) {
+        // WebSocket will handle adding the task to the UI
+        // Just create the activity
+        await addActivity(`added new task "${newTaskText}"`);
+        setNewTaskText('');
+        setShowModal(false);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.msg || 'Failed to create task. Please try again.');
       }
+    } catch (err) {
+      console.error('Error creating task:', err);
+      alert('Error creating task. Please try again.');
     }
   };
 
@@ -177,12 +191,14 @@ export function Taskdetail({ userName }) {
       });
 
       if (response.ok) {
+        // WebSocket will handle updating the task in the UI
         const activityMessage = newCompleted 
           ? `completed "${task.text}"`
           : `uncompleted "${task.text}"`;
         await addActivity(activityMessage);
       } else {
-        alert('Failed to update task. Please try again.');
+        const errorData = await response.json();
+        alert(errorData.msg || 'Failed to update task. Please try again.');
       }
     } catch (err) {
       console.error('Error updating task:', err);
@@ -191,15 +207,21 @@ export function Taskdetail({ userName }) {
   };
 
   const handleDeleteTask = async (task) => {
+    if (!window.confirm(`Delete task "${task.text}"?`)) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/projects/${projectId}/tasks/${task.id}`, {
         method: 'DELETE'
       });
 
       if (response.ok) {
+        // WebSocket will handle removing the task from the UI
         await addActivity(`deleted "${task.text}"`);
       } else {
-        alert('Failed to delete task. Please try again.');
+        const errorData = await response.json();
+        alert(errorData.msg || 'Failed to delete task. Please try again.');
       }
     } catch (err) {
       console.error('Error deleting task:', err);
@@ -217,6 +239,7 @@ export function Taskdetail({ userName }) {
           action: action 
         })
       });
+      // WebSocket will handle adding the activity to the UI
     } catch (err) {
       console.error('Error adding activity:', err);
     }
@@ -314,6 +337,7 @@ export function Taskdetail({ userName }) {
                   <button 
                     className="delete-task-btn"
                     onClick={() => handleDeleteTask(task)}
+                    title="Delete task"
                   >
                     🗑️
                   </button>

@@ -1,9 +1,9 @@
 import React from 'react';
 import './dashboard.css';
 import { Link } from 'react-router-dom';
-import { Invitations } from '../invitations/Invitations'; // NEW IMPORT
+import { Invitations } from '../invitations/Invitations';
 
-export function Dashboard({userName}) {
+export function Dashboard({ userName }) {
   const [projects, setProjects] = React.useState([]);
   const [showModal, setShowModal] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState('');
@@ -83,7 +83,6 @@ export function Dashboard({userName}) {
     return (completed / total) * 100;
   };
 
-  // NEW: Callback when invitation is accepted
   const handleInvitationAccepted = () => {
     loadProjects(); // Refresh projects list
   };
@@ -101,7 +100,7 @@ export function Dashboard({userName}) {
   return (
     <main>
       <div className="container">
-        {/* NEW: Invitations Component */}
+        {/* Invitations Component */}
         <Invitations onInvitationAccepted={handleInvitationAccepted} userEmail={userName} />
 
         <div className="dashboard-header">

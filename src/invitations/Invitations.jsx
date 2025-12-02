@@ -1,6 +1,6 @@
 import React from 'react';
-import './invitations.css';
-import { useWebSocket } from '../hooks/useWebSocket';
+import './Invitations.css';
+import { useWebSocket } from '../hooks/useWebsocket';
 
 export function Invitations({ onInvitationAccepted, userEmail }) {
   const [invitations, setInvitations] = React.useState([]);
