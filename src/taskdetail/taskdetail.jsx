@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
 import { ProjectMembers } from './ProjectMembers';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
@@ -14,14 +15,74 @@ export function Taskdetail({ userName }) {
   const [newTaskText, setNewTaskText] = React.useState('');
   const [loading, setLoading] = React.useState(true);
 
+  // WebSocket connection
+  const { isConnected, lastMessage } = useWebSocket(parseInt(projectId), userName);
+
   // Load project, tasks, and activities on mount
   React.useEffect(() => {
     loadProjectData();
   }, [projectId]);
 
+  // Handle WebSocket messages
+  React.useEffect(() => {
+    if (!lastMessage) return;
+
+    console.log('Processing WebSocket message:', lastMessage);
+
+    switch (lastMessage.type) {
+      case 'task-created':
+        setTasks(prev => [...prev, lastMessage.task]);
+        if (lastMessage.project) {
+          setProject(lastMessage.project);
+        }
+        break;
+
+      case 'task-updated':
+        setTasks(prev => prev.map(t => 
+          t.id === lastMessage.task.id ? lastMessage.task : t
+        ));
+        if (lastMessage.project) {
+          setProject(lastMessage.project);
+        }
+        break;
+
+      case 'task-deleted':
+        setTasks(prev => prev.filter(t => t.id !== lastMessage.taskId));
+        if (lastMessage.project) {
+          setProject(lastMessage.project);
+        }
+        break;
+
+      case 'new-activity':
+        setActivities(prev => [lastMessage.activity, ...prev]);
+        break;
+
+      case 'member-joined':
+        setActivities(prev => [lastMessage.activity, ...prev]);
+        // Reload project to get updated member list
+        loadProject();
+        break;
+
+      case 'member-removed':
+      case 'member-left':
+        setActivities(prev => [lastMessage.activity, ...prev]);
+        // Reload project to get updated member list
+        loadProject();
+        break;
+
+      case 'project-updated':
+        setProject(lastMessage.project);
+        break;
+
+      case 'project-deleted':
+        alert('This project has been deleted by the owner');
+        navigate('/dashboard');
+        break;
+    }
+  }, [lastMessage]);
+
   const loadProjectData = async () => {
     try {
-      // Load project
       const projectRes = await fetch(`/api/projects/${projectId}`);
       if (projectRes.ok) {
         const projectData = await projectRes.json();
@@ -32,23 +93,33 @@ export function Taskdetail({ userName }) {
         return;
       }
 
-      // Load tasks
       const tasksRes = await fetch(`/api/projects/${projectId}/tasks`);
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json();
         setTasks(tasksData);
       }
 
-      // Load activities - they come pre-sorted from backend (newest first)
       const activitiesRes = await fetch(`/api/projects/${projectId}/activities`);
       if (activitiesRes.ok) {
         const activitiesData = await activitiesRes.json();
-        setActivities(activitiesData); // Already sorted by backend
+        setActivities(activitiesData);
       }
     } catch (err) {
       console.error('Error loading project data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProject = async () => {
+    try {
+      const projectRes = await fetch(`/api/projects/${projectId}`);
+      if (projectRes.ok) {
+        const projectData = await projectRes.json();
+        setProject(projectData);
+      }
+    } catch (err) {
+      console.error('Error reloading project:', err);
     }
   };
 
@@ -62,17 +133,9 @@ export function Taskdetail({ userName }) {
         });
 
         if (response.ok) {
-          const newTask = await response.json();
-          setTasks([...tasks, newTask]);
-          
-          // Add activity
           await addActivity(`added new task "${newTaskText}"`);
-          
           setNewTaskText('');
           setShowModal(false);
-          
-          // Reload project to get updated progress
-          await loadProject();
         } else {
           alert('Failed to create task. Please try again.');
         }
@@ -94,21 +157,11 @@ export function Taskdetail({ userName }) {
       });
 
       if (response.ok) {
-        // Update task in local state
-        const updatedTask = { ...task, completed: newCompleted };
-        setTasks(tasks.map(t => t.id === task.id ? updatedTask : t));
-        
-        // Add activity
         const activityMessage = newCompleted 
           ? `completed "${task.text}"`
           : `uncompleted "${task.text}"`;
         await addActivity(activityMessage);
-        
-        // Reload project to get updated progress
-        await loadProject();
       } else {
-        const errorText = await response.text();
-        console.error('Failed to update task:', errorText);
         alert('Failed to update task. Please try again.');
       }
     } catch (err) {
@@ -124,13 +177,7 @@ export function Taskdetail({ userName }) {
       });
 
       if (response.ok) {
-        setTasks(tasks.filter(t => t.id !== task.id));
-        
-        // Add activity
         await addActivity(`deleted "${task.text}"`);
-        
-        // Reload project to get updated progress
-        await loadProject();
       } else {
         alert('Failed to delete task. Please try again.');
       }
@@ -142,7 +189,7 @@ export function Taskdetail({ userName }) {
 
   const addActivity = async (action) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/activities`, {
+      await fetch(`/api/projects/${projectId}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -150,26 +197,8 @@ export function Taskdetail({ userName }) {
           action: action 
         })
       });
-
-      if (response.ok) {
-        const newActivity = await response.json();
-        // Add to beginning since we want newest first
-        setActivities([newActivity, ...activities]);
-      }
     } catch (err) {
       console.error('Error adding activity:', err);
-    }
-  };
-
-  const loadProject = async () => {
-    try {
-      const projectRes = await fetch(`/api/projects/${projectId}`);
-      if (projectRes.ok) {
-        const projectData = await projectRes.json();
-        setProject(projectData);
-      }
-    } catch (err) {
-      console.error('Error reloading project:', err);
     }
   };
 
@@ -215,7 +244,6 @@ export function Taskdetail({ userName }) {
   return (
     <main>
       <div id="task-and-chat-container">
-        {/* Project Members Component */}
         <ProjectMembers 
           projectId={parseInt(projectId)}
           projectOwner={project.owner}
@@ -228,7 +256,10 @@ export function Taskdetail({ userName }) {
               <button className="back-btn" onClick={() => navigate('/dashboard')}>
                 ← Back to Dashboard
               </button>
-              <h2>{project.name}</h2>
+              <h2>
+                {project.name}
+                {isConnected && <span style={{ marginLeft: '10px', color: '#4ade80', fontSize: '0.8rem' }}>● Live</span>}
+              </h2>
               <div className="project-progress-detail">
                 <div className="progress-bar-large">
                   <div
@@ -285,7 +316,6 @@ export function Taskdetail({ userName }) {
         )}
       </div>
 
-      {/* Modal for adding new task */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
