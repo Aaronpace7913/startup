@@ -102,7 +102,7 @@ export function Dashboard() {
     <main>
       <div className="container">
         {/* NEW: Invitations Component */}
-        <Invitations onInvitationAccepted={handleInvitationAccepted} />
+        <Invitations onInvitationAccepted={handleInvitationAccepted} userEmail={userName} />
 
         <div className="dashboard-header">
           <h2>My Projects</h2>
