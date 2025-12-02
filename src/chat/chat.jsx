@@ -1,34 +1,43 @@
 import React from 'react';
 import './chat.css';
+import { useWebSocket } from './hooks/useWebSocket';
 
 export function Chat({ userName }) {
   const [messages, setMessages] = React.useState([]);
   const [newMessage, setNewMessage] = React.useState('');
-  const [isTyping, setIsTyping] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const messagesEndRef = React.useRef(null);
+
+  // WebSocket connection for global chat
+  const { isConnected, lastMessage } = useWebSocket('global', userName);
 
   // Load messages from backend on mount
   React.useEffect(() => {
     loadMessages();
-    
-    // Poll for new messages every 3 seconds
-    const interval = setInterval(loadMessages, 3000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Handle WebSocket messages
+  React.useEffect(() => {
+    if (!lastMessage) return;
+
+    if (lastMessage.type === 'new-message') {
+      setMessages(prev => {
+        // Avoid duplicates
+        if (prev.find(m => m.id === lastMessage.message.id)) {
+          return prev;
+        }
+        return [...prev, {
+          ...lastMessage.message,
+          timestamp: new Date(lastMessage.message.timestamp)
+        }];
+      });
+    }
+  }, [lastMessage]);
 
   // Auto-scroll to bottom when new messages arrive
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Simulate "someone is typing" indicator
-  React.useEffect(() => {
-    if (isTyping) {
-      const timer = setTimeout(() => setIsTyping(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isTyping]);
 
   const loadMessages = async () => {
     try {
@@ -60,50 +69,7 @@ export function Chat({ userName }) {
         });
 
         if (response.ok) {
-          const message = await response.json();
-          setMessages([...messages, {
-            ...message,
-            timestamp: new Date(message.timestamp)
-          }]);
           setNewMessage('');
-          
-          // Simulate another user typing after you send a message
-          setTimeout(() => setIsTyping(true), 1000);
-          
-          // Simulate a response from another user
-          setTimeout(async () => {
-            const responses = [
-              'Got it!',
-              'Thanks for the update!',
-              'Sounds good to me.',
-              'I\'ll take a look at that.',
-              'Great work!'
-            ];
-            const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-            
-            try {
-              const botResponse = await fetch('/api/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  user: 'Team Member',
-                  text: randomResponse
-                })
-              });
-
-              if (botResponse.ok) {
-                const botMessage = await botResponse.json();
-                setMessages(prev => [...prev, {
-                  ...botMessage,
-                  timestamp: new Date(botMessage.timestamp)
-                }]);
-              }
-            } catch (err) {
-              console.error('Error sending bot response:', err);
-            }
-            
-            setIsTyping(false);
-          }, 3000);
         } else {
           alert('Failed to send message. Please try again.');
         }
@@ -136,7 +102,10 @@ export function Chat({ userName }) {
     return (
       <main>
         <section id="team-chat">
-          <h2>TEAM CHAT</h2>
+          <h2>
+            TEAM CHAT
+            {isConnected && <span style={{ marginLeft: '10px', color: '#4ade80', fontSize: '0.8rem' }}>● Live</span>}
+          </h2>
           <div className="loading">Loading messages...</div>
         </section>
       </main>
@@ -146,7 +115,10 @@ export function Chat({ userName }) {
   return (
     <main>
       <section id="team-chat">
-        <h2>TEAM CHAT</h2>
+        <h2>
+          TEAM CHAT
+          {isConnected && <span style={{ marginLeft: '10px', color: '#4ade80', fontSize: '0.8rem' }}>● Live</span>}
+        </h2>
         <div id="chat-messages-placeholder">
           {messages.length === 0 ? (
             <p className="empty-chat">No messages yet. Start the conversation!</p>
@@ -158,11 +130,6 @@ export function Chat({ userName }) {
                 <span className="message-time">{formatTime(message.timestamp)}</span>
               </p>
             ))
-          )}
-          {isTyping && (
-            <p className="typing-indicator">
-              <em>Team Member is typing...</em>
-            </p>
           )}
           <div ref={messagesEndRef} />
         </div>
