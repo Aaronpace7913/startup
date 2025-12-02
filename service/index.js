@@ -2,11 +2,12 @@ const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const express = require('express');
 const uuid = require('uuid');
+const { WebSocketServer } = require('ws');
+const http = require('http');
 const app = express();
 const DB = require('./database.js');
 
 const authCookieName = 'token';
-
 const port = process.argv.length > 2 ? process.argv[2] : 4000;
 
 app.use(express.json());
@@ -16,9 +17,85 @@ app.use(express.static('public'));
 var apiRouter = express.Router();
 app.use(`/api`, apiRouter);
 
+// Create HTTP server
+const server = http.createServer(app);
+
+// WebSocket connection management
+let connections = [];
+
+// ========== WEBSOCKET SETUP ==========
+const wss = new WebSocketServer({ noServer: true });
+
+wss.on('connection', (ws) => {
+  const connection = { id: uuid.v4(), alive: true, ws: ws, projectId: null, userEmail: null };
+  connections.push(connection);
+
+  // Respond to pong messages by marking the connection alive
+  ws.on('pong', () => {
+    connection.alive = true;
+  });
+
+  ws.on('message', async (data) => {
+    try {
+      const msg = JSON.parse(data);
+      
+      // Handle authentication
+      if (msg.type === 'auth') {
+        connection.userEmail = msg.userEmail;
+        connection.projectId = msg.projectId;
+        console.log(`WebSocket authenticated: ${msg.userEmail} for project ${msg.projectId}`);
+      }
+    } catch (error) {
+      console.error('WebSocket message error:', error);
+    }
+  });
+
+  ws.on('close', () => {
+    connections = connections.filter((c) => c.id !== connection.id);
+  });
+});
+
+// Keep alive ping/pong
+setInterval(() => {
+  connections.forEach((c) => {
+    if (!c.alive) {
+      c.ws.terminate();
+    } else {
+      c.alive = false;
+      c.ws.ping();
+    }
+  });
+}, 10000);
+
+// Broadcast message to all connections in a specific project
+function broadcastToProject(projectId, message) {
+  connections.forEach((c) => {
+    if (c.projectId === projectId && c.ws.readyState === c.ws.OPEN) {
+      c.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
+// Broadcast to a specific user across all their projects
+function broadcastToUser(userEmail, message) {
+  connections.forEach((c) => {
+    if (c.userEmail === userEmail && c.ws.readyState === c.ws.OPEN) {
+      c.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
+// Broadcast to global chat
+function broadcastGlobal(message) {
+  connections.forEach((c) => {
+    if (c.projectId === 'global' && c.ws.readyState === c.ws.OPEN) {
+      c.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
 // ========== AUTHENTICATION ENDPOINTS ==========
 
-// Create a new user
 apiRouter.post('/auth/create', async (req, res) => {
   if (await findUser('email', req.body.email)) {
     res.status(409).send({ msg: 'Existing user' });
@@ -29,7 +106,6 @@ apiRouter.post('/auth/create', async (req, res) => {
   }
 });
 
-// Login an existing user
 apiRouter.post('/auth/login', async (req, res) => {
   const user = await findUser('email', req.body.email);
   if (user) {
@@ -44,7 +120,6 @@ apiRouter.post('/auth/login', async (req, res) => {
   res.status(401).send({ msg: 'Unauthorized' });
 });
 
-// Logout a user
 apiRouter.delete('/auth/logout', async (req, res) => {
   const user = await findUser('token', req.cookies[authCookieName]);
   if (user) {
@@ -55,7 +130,6 @@ apiRouter.delete('/auth/logout', async (req, res) => {
   res.status(204).end();
 });
 
-// Get current user info
 apiRouter.get('/auth/user', async (req, res) => {
   const authToken = req.cookies[authCookieName];
   const user = await findUser('token', authToken);
@@ -80,21 +154,15 @@ async function verifyAuth(req, res, next) {
 
 // ========== USER SEARCH ENDPOINT ==========
 
-// Search for users by email (for invitations)
 apiRouter.get('/users/search', verifyAuth, async (req, res) => {
   try {
     const query = req.query.q;
     
-    if (!query || query.length < 1) {
-      return res.status(400).send({ msg: 'Query must be at least 1 character' });
+    if (!query || query.length < 2) {
+      return res.status(400).send({ msg: 'Query must be at least 2 characters' });
     }
     
-    console.log(`Searching for users with query: ${query}`);
-    
     const users = await DB.searchUsers(query);
-    console.log(`Found ${users.length} users`);
-    
-    // Return email only (no sensitive data)
     const results = users.map(user => ({ email: user.email }));
     res.send(results);
   } catch (err) {
@@ -105,19 +173,17 @@ apiRouter.get('/users/search', verifyAuth, async (req, res) => {
 
 // ========== PROJECT ENDPOINTS ==========
 
-// Get all projects for the current user
 apiRouter.get('/projects', verifyAuth, async (req, res) => {
   const userProjects = await DB.getProjects(req.user.email);
   res.send(userProjects);
 });
 
-// Create a new project
 apiRouter.post('/projects', verifyAuth, async (req, res) => {
   const newProject = {
     id: Date.now(),
     name: req.body.name,
     owner: req.user.email,
-    members: [req.user.email], // Owner is automatically a member
+    members: [req.user.email],
     completed: 0,
     total: 0,
     createdAt: new Date().toISOString()
@@ -127,7 +193,6 @@ apiRouter.post('/projects', verifyAuth, async (req, res) => {
   res.send(newProject);
 });
 
-// Get a specific project
 apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -139,19 +204,22 @@ apiRouter.get('/projects/:id', verifyAuth, async (req, res) => {
   }
 });
 
-// Update a project
 apiRouter.put('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const updatedProject = await DB.updateProject(projectId, req.user.email, req.body);
   
   if (updatedProject) {
+    // Broadcast project update
+    broadcastToProject(projectId, {
+      type: 'project-updated',
+      project: updatedProject
+    });
     res.send(updatedProject);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
-// Delete a project (owner only)
 apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -161,15 +229,21 @@ apiRouter.delete('/projects/:id', verifyAuth, async (req, res) => {
     await DB.deleteTasksByProject(projectId);
     await DB.deleteMessagesByProject(projectId);
     await DB.deleteActivitiesByProject(projectId);
+    
+    // Broadcast project deletion
+    broadcastToProject(projectId, {
+      type: 'project-deleted',
+      projectId: projectId
+    });
+    
     res.status(204).end();
   } else {
     res.status(403).send({ msg: 'Only the project owner can delete the project' });
   }
 });
 
-// ========== NEW: MEMBER MANAGEMENT ENDPOINTS ==========
+// ========== MEMBER MANAGEMENT ENDPOINTS ==========
 
-// Get all members of a project
 apiRouter.get('/projects/:id/members', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -181,13 +255,14 @@ apiRouter.get('/projects/:id/members', verifyAuth, async (req, res) => {
   }
 });
 
-// Invite a member to a project (owner only)
 apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const inviteEmail = req.body.email;
     
-    console.log(`Attempting to invite ${inviteEmail} to project ${projectId}`);
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      return res.status(400).send({ msg: 'Invalid email address' });
+    }
     
     const project = await DB.getProject(projectId, req.user.email);
     
@@ -199,18 +274,15 @@ apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
       return res.status(403).send({ msg: 'Only the project owner can invite members' });
     }
     
-    // Check if user exists
     const invitedUser = await DB.getUser(inviteEmail);
     if (!invitedUser) {
       return res.status(404).send({ msg: `User with email ${inviteEmail} not found. They need to create an account first.` });
     }
     
-    // Check if already a member
     if (project.members && project.members.includes(inviteEmail)) {
       return res.status(409).send({ msg: 'User is already a member' });
     }
     
-    // Check if invitation already exists
     const existingInvitations = await DB.getInvitations(inviteEmail);
     const alreadyInvited = existingInvitations.some(
       inv => inv.projectId === projectId && inv.status === 'pending'
@@ -220,7 +292,6 @@ apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
       return res.status(409).send({ msg: 'User has already been invited to this project' });
     }
     
-    // Create invitation
     const invitation = {
       id: Date.now(),
       projectId: projectId,
@@ -232,7 +303,13 @@ apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
     };
     
     await DB.createInvitation(invitation);
-    console.log(`Invitation created successfully for ${inviteEmail}`);
+    
+    // Broadcast new invitation to the invited user
+    broadcastToUser(inviteEmail, {
+      type: 'new-invitation',
+      invitation: invitation
+    });
+    
     res.send({ msg: 'Invitation sent', invitation });
   } catch (err) {
     console.error('Error in invite endpoint:', err);
@@ -240,13 +317,11 @@ apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
   }
 });
 
-// Get all invitations for current user
 apiRouter.get('/invitations', verifyAuth, async (req, res) => {
   const invitations = await DB.getInvitations(req.user.email);
   res.send(invitations);
 });
 
-// Accept an invitation
 apiRouter.post('/invitations/:id/accept', verifyAuth, async (req, res) => {
   const invitationId = parseInt(req.params.id);
   const invitations = await DB.getInvitations(req.user.email);
@@ -260,7 +335,6 @@ apiRouter.post('/invitations/:id/accept', verifyAuth, async (req, res) => {
     return res.status(403).send({ msg: 'This invitation is not for you' });
   }
   
-  // Add user to project
   const project = await DB.getProject(invitation.projectId, invitation.fromEmail);
   if (!project) {
     return res.status(404).send({ msg: 'Project no longer exists' });
@@ -269,19 +343,25 @@ apiRouter.post('/invitations/:id/accept', verifyAuth, async (req, res) => {
   await DB.addProjectMember(invitation.projectId, project.owner, req.user.email);
   await DB.updateInvitation(invitationId, 'accepted');
   
-  // Add activity
-  await DB.addActivity({
+  const activity = {
     id: Date.now(),
     projectId: invitation.projectId,
     user: req.user.email,
     action: 'joined the project',
     timestamp: new Date().toISOString()
+  };
+  await DB.addActivity(activity);
+  
+  // Broadcast member joined
+  broadcastToProject(invitation.projectId, {
+    type: 'member-joined',
+    member: req.user.email,
+    activity: activity
   });
   
   res.send({ msg: 'Invitation accepted', project });
 });
 
-// Decline an invitation
 apiRouter.post('/invitations/:id/decline', verifyAuth, async (req, res) => {
   const invitationId = parseInt(req.params.id);
   const invitations = await DB.getInvitations(req.user.email);
@@ -299,7 +379,6 @@ apiRouter.post('/invitations/:id/decline', verifyAuth, async (req, res) => {
   res.send({ msg: 'Invitation declined' });
 });
 
-// Remove a member from a project (owner only)
 apiRouter.delete('/projects/:id/members/:email', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const memberEmail = req.params.email;
@@ -319,19 +398,25 @@ apiRouter.delete('/projects/:id/members/:email', verifyAuth, async (req, res) =>
   
   await DB.removeProjectMember(projectId, req.user.email, memberEmail);
   
-  // Add activity
-  await DB.addActivity({
+  const activity = {
     id: Date.now(),
     projectId: projectId,
     user: req.user.email,
     action: `removed ${memberEmail} from the project`,
     timestamp: new Date().toISOString()
+  };
+  await DB.addActivity(activity);
+  
+  // Broadcast member removed
+  broadcastToProject(projectId, {
+    type: 'member-removed',
+    member: memberEmail,
+    activity: activity
   });
   
   res.send({ msg: 'Member removed' });
 });
 
-// Leave a project (member only, not owner)
 apiRouter.post('/projects/:id/leave', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -346,13 +431,20 @@ apiRouter.post('/projects/:id/leave', verifyAuth, async (req, res) => {
   
   await DB.removeProjectMember(projectId, project.owner, req.user.email);
   
-  // Add activity
-  await DB.addActivity({
+  const activity = {
     id: Date.now(),
     projectId: projectId,
     user: req.user.email,
     action: 'left the project',
     timestamp: new Date().toISOString()
+  };
+  await DB.addActivity(activity);
+  
+  // Broadcast member left
+  broadcastToProject(projectId, {
+    type: 'member-left',
+    member: req.user.email,
+    activity: activity
   });
   
   res.send({ msg: 'You have left the project' });
@@ -360,7 +452,6 @@ apiRouter.post('/projects/:id/leave', verifyAuth, async (req, res) => {
 
 // ========== TASK ENDPOINTS ==========
 
-// Get all tasks for a project
 apiRouter.get('/projects/:id/tasks', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -373,7 +464,6 @@ apiRouter.get('/projects/:id/tasks', verifyAuth, async (req, res) => {
   }
 });
 
-// Create a new task
 apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -389,7 +479,14 @@ apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
     };
     
     await DB.addTask(newTask);
-    await updateProjectProgress(projectId, req.user.email);
+    const updatedProject = await updateProjectProgress(projectId, project.owner);
+    
+    // Broadcast new task
+    broadcastToProject(projectId, {
+      type: 'task-created',
+      task: newTask,
+      project: updatedProject
+    });
     
     res.send(newTask);
   } else {
@@ -397,7 +494,6 @@ apiRouter.post('/projects/:id/tasks', verifyAuth, async (req, res) => {
   }
 });
 
-// Update a task
 apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.projectId);
   const taskId = parseInt(req.params.taskId);
@@ -406,7 +502,15 @@ apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res)
   if (project) {
     const updatedTask = await DB.updateTask(projectId, taskId, req.body);
     if (updatedTask) {
-      await updateProjectProgress(projectId, req.user.email);
+      const updatedProject = await updateProjectProgress(projectId, project.owner);
+      
+      // Broadcast task update
+      broadcastToProject(projectId, {
+        type: 'task-updated',
+        task: updatedTask,
+        project: updatedProject
+      });
+      
       res.send(updatedTask);
     } else {
       res.status(404).send({ msg: 'Task not found' });
@@ -416,7 +520,6 @@ apiRouter.put('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res)
   }
 });
 
-// Delete a task
 apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.projectId);
   const taskId = parseInt(req.params.taskId);
@@ -424,7 +527,15 @@ apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, r
   
   if (project) {
     await DB.deleteTask(projectId, taskId);
-    await updateProjectProgress(projectId, req.user.email);
+    const updatedProject = await updateProjectProgress(projectId, project.owner);
+    
+    // Broadcast task deletion
+    broadcastToProject(projectId, {
+      type: 'task-deleted',
+      taskId: taskId,
+      project: updatedProject
+    });
+    
     res.status(204).end();
   } else {
     res.status(404).send({ msg: 'Project not found' });
@@ -433,7 +544,6 @@ apiRouter.delete('/projects/:projectId/tasks/:taskId', verifyAuth, async (req, r
 
 // ========== MESSAGE ENDPOINTS ==========
 
-// Get all chat messages for a project
 apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -446,7 +556,6 @@ apiRouter.get('/projects/:id/messages', verifyAuth, async (req, res) => {
   }
 });
 
-// Post a new chat message
 apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -461,13 +570,19 @@ apiRouter.post('/projects/:id/messages', verifyAuth, async (req, res) => {
     };
     
     await DB.addMessage(newMessage);
+    
+    // Broadcast new message
+    broadcastToProject(projectId, {
+      type: 'new-message',
+      message: newMessage
+    });
+    
     res.send(newMessage);
   } else {
     res.status(404).send({ msg: 'Project not found' });
   }
 });
 
-// Global messages endpoints (for the general chat page)
 apiRouter.get('/messages', verifyAuth, async (req, res) => {
   const messages = await DB.getMessages('global');
   res.send(messages);
@@ -483,12 +598,18 @@ apiRouter.post('/messages', verifyAuth, async (req, res) => {
   };
   
   await DB.addMessage(newMessage);
+  
+  // Broadcast global message
+  broadcastGlobal({
+    type: 'new-message',
+    message: newMessage
+  });
+  
   res.send(newMessage);
 });
 
 // ========== ACTIVITY ENDPOINTS ==========
 
-// Get activities for a project
 apiRouter.get('/projects/:id/activities', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -501,7 +622,6 @@ apiRouter.get('/projects/:id/activities', verifyAuth, async (req, res) => {
   }
 });
 
-// Post a new activity
 apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
   const project = await DB.getProject(projectId, req.user.email);
@@ -516,6 +636,13 @@ apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
     };
     
     await DB.addActivity(newActivity);
+    
+    // Broadcast new activity
+    broadcastToProject(projectId, {
+      type: 'new-activity',
+      activity: newActivity
+    });
+    
     res.send(newActivity);
   } else {
     res.status(404).send({ msg: 'Project not found' });
@@ -524,19 +651,19 @@ apiRouter.post('/projects/:id/activities', verifyAuth, async (req, res) => {
 
 // ========== HELPER FUNCTIONS ==========
 
-// Update project progress based on task completion
 async function updateProjectProgress(projectId, ownerEmail) {
   const tasks = await DB.getTasks(projectId);
   const total = tasks.length;
   const completed = tasks.filter(t => t.completed).length;
   
-  await DB.updateProject(projectId, ownerEmail, { 
+  const updatedProject = await DB.updateProject(projectId, ownerEmail, { 
     total: total, 
     completed: completed 
   });
+  
+  return updatedProject;
 }
 
-// Create a new user
 async function createUser(email, password) {
   const passwordHash = await bcrypt.hash(password, 10);
   
@@ -550,7 +677,6 @@ async function createUser(email, password) {
   return user;
 }
 
-// Find a user by field and value
 async function findUser(field, value) {
   if (!value) return null;
   
@@ -560,7 +686,6 @@ async function findUser(field, value) {
   return DB.getUser(value);
 }
 
-// Set authentication cookie
 function setAuthCookie(res, authToken) {
   res.cookie(authCookieName, authToken, {
     maxAge: 1000 * 60 * 60 * 24 * 365,
@@ -580,6 +705,13 @@ app.use((_req, res) => {
   res.sendFile('index.html', { root: 'public' });
 });
 
-app.listen(port, () => {
+// Upgrade HTTP to WebSocket
+server.on('upgrade', (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, function done(ws) {
+    wss.emit('connection', ws, request);
+  });
+});
+
+server.listen(port, () => {
   console.log(`GroupTask service listening on port ${port}`);
 });
