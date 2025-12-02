@@ -10,19 +10,106 @@ main {
   justify-content: center;
   align-items: center;
   padding: 2rem;
+  width: 100%;
 }
 
-#team-chat {
+.chat-container {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 1200px;
+  height: 600px;
   margin-top: 10px;
+}
+
+/* Project Sidebar */
+.project-sidebar {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(45, 82, 48, 0.1);
+  border: 2px solid #a8e6a3;
+  padding: 1.5rem;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.project-sidebar h3 {
+  color: #2d5230;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e8f5e8;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.project-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.project-list::-webkit-scrollbar-track {
+  background: #e8f5e8;
+  border-radius: 3px;
+}
+
+.project-list::-webkit-scrollbar-thumb {
+  background: #6fcf67;
+  border-radius: 3px;
+}
+
+.project-item {
+  background: rgba(248, 250, 252, 0.8);
+  border: 2px solid #e8f5e8;
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.project-item:hover {
+  background: rgba(168, 230, 163, 0.2);
+  border-color: #a8e6a3;
+  transform: translateX(5px);
+}
+
+.project-item.active {
+  background: linear-gradient(135deg, rgba(111, 207, 103, 0.2), rgba(74, 222, 128, 0.2));
+  border-color: #6fcf67;
+  border-width: 2px;
+}
+
+.project-name {
+  color: #2d5230;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.project-members {
+  color: #6b7280;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Chat Section */
+#team-chat {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 20px;
   box-shadow: 0 20px 40px rgba(45, 82, 48, 0.1);
   border: 2px solid #a8e6a3;
   display: flex;
   flex-direction: column;
-  height: 600px;
-  width: 100%;
-  max-width: 900px;
+  height: 100%;
+  flex: 1;
 }
 
 #team-chat h2 {
@@ -32,6 +119,15 @@ main {
   border-radius: 20px 20px 0 0;
   background: linear-gradient(135deg, rgba(168, 230, 163, 0.2), rgba(111, 207, 103, 0.1));
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.live-indicator {
+  margin-left: 10px;
+  color: #4ade80;
+  font-size: 0.8rem;
 }
 
 #chat-messages-placeholder {
@@ -76,6 +172,7 @@ main {
   font-size: 0.95rem;
   color: #2d5230;
   line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 .message-time {
@@ -102,23 +199,15 @@ main {
   border-left: 3px solid #6fcf67;
 }
 
-.typing-indicator {
-  align-self: flex-start;
-  background: rgba(200, 200, 200, 0.4) !important;
-  border: none !important;
+.empty-chat {
+  align-self: center !important;
+  text-align: center;
+  color: #6b7280;
   font-style: italic;
-  color: #6b7280 !important;
-  padding: 0.5rem 1rem !important;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
+  padding: 2rem;
+  border: 2px dashed #a8e6a3 !important;
+  background: rgba(248, 250, 252, 0.5) !important;
+  max-width: 80% !important;
 }
 
 #chat-messages-placeholder::-webkit-scrollbar {
@@ -163,6 +252,11 @@ main {
   outline: none;
 }
 
+#chat-input input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
 #chat-input input::placeholder {
   color: #9ca3af;
 }
@@ -179,11 +273,61 @@ main {
   white-space: nowrap;
 }
 
-#chat-input button:hover {
+#chat-input button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(111, 207, 103, 0.3);
 }
 
 #chat-input button:active {
   transform: translateY(0);
+}
+
+#chat-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Empty state styling */
+.empty-state {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 3rem;
+  border-radius: 16px;
+  border: 2px dashed #a8e6a3;
+  margin: 2rem;
+}
+
+.empty-state h3 {
+  color: #4a7c4f;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  color: #6b7280;
+}
+
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Responsive design */
+@media (max-width: 900px) {
+  .chat-container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .project-sidebar {
+    width: 100%;
+    max-height: 200px;
+  }
+  
+  #team-chat {
+    height: 500px;
+  }
 }
