@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
 import { ProjectMembers } from './ProjectMembers';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from './hooks/useWebSocket';
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
