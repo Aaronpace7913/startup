@@ -23,7 +23,8 @@ npm install # make sure vite is installed so that we can bundle
 npm run build # build the React front end
 cp -rf dist build/public # move the React front end to the target distribution
 cp service/*.js build # move the back end service to the target distribution
-cp service/*.json build
+cp service/package.json build # copy package.json
+cp service/package-lock.json build # copy package-lock.json
 
 # Step 2
 printf "\n----> Clearing out previous distribution on the target\n"
@@ -36,16 +37,32 @@ ENDSSH
 printf "\n----> Copy the distribution package to the target\n"
 scp -r -i "$key" build/* ubuntu@$hostname:services/$service
 
-# Step 4
+# Step 4 - Create database configuration on server
+printf "\n----> Creating database configuration on server\n"
+ssh -i "$key" ubuntu@$hostname << ENDSSH
+cat > services/${service}/dbConfig.json << 'EOF'
+{
+  "userName": "aaronpace7914_db_user",
+  "password": "Elegableformongodb1!",
+  "hostname": "cluster0.mwz6glp.mongodb.net"
+}
+EOF
+chmod 600 services/${service}/dbConfig.json
+ENDSSH
+
+# Step 5
 printf "\n----> Deploy the service on the target\n"
 ssh -i "$key" ubuntu@$hostname << ENDSSH
 bash -i
 cd services/${service}
 npm install
 pm2 restart ${service}
+pm2 save
 ENDSSH
 
-# Step 5
+# Step 6
 printf "\n----> Removing local copy of the distribution package\n"
 rm -rf build
 rm -rf dist
+
+printf "\n----> Deployment complete!\n"
