@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './taskdetail.css';
-import { ProjectMembers } from './ProjectMembers'; // NEW IMPORT
+import { ProjectMembers } from './ProjectMembers';
 
 export function Taskdetail({ userName }) {
   const { projectId } = useParams();
@@ -39,11 +39,11 @@ export function Taskdetail({ userName }) {
         setTasks(tasksData);
       }
 
-      // Load activities
+      // Load activities - they come pre-sorted from backend (newest first)
       const activitiesRes = await fetch(`/api/projects/${projectId}/activities`);
       if (activitiesRes.ok) {
         const activitiesData = await activitiesRes.json();
-        setActivities(activitiesData);
+        setActivities(activitiesData); // Already sorted by backend
       }
     } catch (err) {
       console.error('Error loading project data:', err);
@@ -153,6 +153,7 @@ export function Taskdetail({ userName }) {
 
       if (response.ok) {
         const newActivity = await response.json();
+        // Add to beginning since we want newest first
         setActivities([newActivity, ...activities]);
       }
     } catch (err) {
@@ -214,7 +215,7 @@ export function Taskdetail({ userName }) {
   return (
     <main>
       <div id="task-and-chat-container">
-        {/* NEW: Project Members Component */}
+        {/* Project Members Component */}
         <ProjectMembers 
           projectId={parseInt(projectId)}
           projectOwner={project.owner}

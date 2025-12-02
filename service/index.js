@@ -85,8 +85,8 @@ apiRouter.get('/users/search', verifyAuth, async (req, res) => {
   try {
     const query = req.query.q;
     
-    if (!query || query.length < 2) {
-      return res.status(400).send({ msg: 'Query must be at least 2 characters' });
+    if (!query || query.length < 1) {
+      return res.status(400).send({ msg: 'Query must be at least 1 character' });
     }
     
     console.log(`Searching for users with query: ${query}`);
@@ -188,10 +188,6 @@ apiRouter.post('/projects/:id/invite', verifyAuth, async (req, res) => {
     const inviteEmail = req.body.email;
     
     console.log(`Attempting to invite ${inviteEmail} to project ${projectId}`);
-    
-    if (!inviteEmail || !inviteEmail.includes('@')) {
-      return res.status(400).send({ msg: 'Invalid email address' });
-    }
     
     const project = await DB.getProject(projectId, req.user.email);
     

@@ -16,9 +16,20 @@ export function Login({ userName, authState, onAuthChange }) {
     }
   }, [authState, navigate]);
 
+  // Validate email has @ sign
+  const isValidEmail = (email) => {
+    return email.includes('@');
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate email format
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address with @ sign');
+      return;
+    }
     
     if (email && password) {
       try {
@@ -49,6 +60,12 @@ export function Login({ userName, authState, onAuthChange }) {
     e.preventDefault();
     setError('');
     
+    // Validate email format
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address with @ sign');
+      return;
+    }
+    
     if (email && password) {
       try {
         const response = await fetch('/api/auth/create', {
@@ -78,17 +95,18 @@ export function Login({ userName, authState, onAuthChange }) {
     <main>
       <section className="hero-section">
         <h1>Welcome to GroupTask</h1>
-        {error && <div className="error-message" style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
+        {error && <div className="error-message">{error}</div>}
         <form className="login-form" onSubmit={handleLogin}>
           <div className="form-group">
             <div className="input-wrapper">
               <span className="input-icon">@</span>
               <input 
                 className="form-input" 
-                type="text" 
+                type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)} 
+                required
               />
             </div>
           </div>
@@ -101,6 +119,7 @@ export function Login({ userName, authState, onAuthChange }) {
                 placeholder="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
           </div>
@@ -108,7 +127,7 @@ export function Login({ userName, authState, onAuthChange }) {
             <button 
               className="btn btn-primary" 
               type="submit"
-              disabled={!email || !password}
+              disabled={!email || !password || !isValidEmail(email)}
             >
               Login
             </button>
@@ -116,7 +135,7 @@ export function Login({ userName, authState, onAuthChange }) {
               className="btn btn-secondary" 
               type="button"
               onClick={handleCreate}
-              disabled={!email || !password}
+              disabled={!email || !password || !isValidEmail(email)}
             >
               Create
             </button>

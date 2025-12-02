@@ -1,5 +1,5 @@
 import React from 'react';
-import './projectMembers.css';
+import './ProjectMembers.css';
 
 export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
   const [members, setMembers] = React.useState([]);
@@ -18,12 +18,13 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
     loadMembers();
   }, [projectId]);
 
-  // Search for users as they type
+  // Search for users as they type (minimum 1 character now)
   React.useEffect(() => {
-    if (searchQuery.length >= 2) {
+    if (searchQuery.length >= 1) {
       searchUsers();
     } else {
       setSearchResults([]);
+      setSelectedUser(null);
     }
   }, [searchQuery]);
 
@@ -66,32 +67,64 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
 
   const handleSelectUser = (user) => {
     setSelectedUser(user);
-    setSearchQuery(user.email);
+    setSearchQuery(user.email); // Show their email in the search box
     setSearchResults([]);
+  };
+
+  const handleSelectUserAndInvite = async (user) => {
+    setError('');
+    setSearching(true);
+    
+    try {
+      const response = await fetch(`/api/projects/${projectId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email })
+      });
+
+      if (response.ok) {
+        alert(`Invitation sent to ${user.email}!`);
+        setSearchQuery('');
+        setSelectedUser(null);
+        setShowInviteModal(false);
+        setSearchResults([]);
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.msg || 'Failed to send invitation');
+      }
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      setError('Network error. Please try again.');
+    } finally {
+      setSearching(false);
+    }
   };
 
   const handleInvite = async () => {
     setError('');
     
-    if (!selectedUser && !searchQuery.includes('@')) {
-      setError('Please select a user from the search results');
+    if (!searchQuery.trim()) {
+      setError('Please enter a username or email');
       return;
     }
 
-    const emailToInvite = selectedUser ? selectedUser.email : searchQuery;
+    const identifierToInvite = selectedUser ? selectedUser.email : searchQuery.trim();
 
     try {
       const response = await fetch(`/api/projects/${projectId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailToInvite })
+        body: JSON.stringify({ email: identifierToInvite })
       });
 
       if (response.ok) {
-        alert(`Invitation sent to ${emailToInvite}!`);
+        alert(`Invitation sent to ${identifierToInvite}!`);
         setSearchQuery('');
         setSelectedUser(null);
         setShowInviteModal(false);
+        setSearchResults([]);
+        setError('');
       } else {
         const errorData = await response.json();
         setError(errorData.msg || 'Failed to send invitation');
@@ -199,8 +232,19 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
 
       {/* Invite Modal with Search */}
       {showInviteModal && (
-        <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal-content modal-search" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="modal-overlay" 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowInviteModal(false);
+              setError('');
+              setSearchQuery('');
+              setSelectedUser(null);
+              setSearchResults([]);
+            }
+          }}
+        >
+          <div className="modal-content modal-search">
             <button 
               className="modal-close"
               onClick={() => {
@@ -219,23 +263,24 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
             <div className="search-container">
               <input
                 type="text"
-                placeholder="Search by name or email (min 2 characters)"
+                placeholder="Search by username or email..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setSelectedUser(null);
+                  setError('');
                 }}
                 autoFocus
               />
               {searching && <div className="search-loading">Searching...</div>}
               
-              {searchResults.length > 0 && (
+              {searchResults.length > 0 && !searching && (
                 <div className="search-results">
                   {searchResults.map((user) => (
                     <div 
                       key={user.email}
                       className="search-result-item"
-                      onClick={() => handleSelectUser(user)}
+                      onClick={() => handleSelectUserAndInvite(user)}
                     >
                       <span className="result-icon">👤</span>
                       <div className="result-info">
@@ -246,9 +291,9 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
                 </div>
               )}
               
-              {searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
+              {searchQuery.length >= 1 && searchResults.length === 0 && !searching && (
                 <div className="no-results">
-                  No users found. You can still invite by email.
+                  No users found. Type the exact username/email and click "Send Invitation" to invite them.
                 </div>
               )}
             </div>
@@ -269,9 +314,9 @@ export function ProjectMembers({ projectId, projectOwner, currentUserEmail }) {
               <button 
                 className="btn-create" 
                 onClick={handleInvite}
-                disabled={!searchQuery.trim()}
+                disabled={!searchQuery.trim() || searching}
               >
-                Send Invitation
+                {searching ? 'Sending...' : 'Send Invitation'}
               </button>
             </div>
           </div>
