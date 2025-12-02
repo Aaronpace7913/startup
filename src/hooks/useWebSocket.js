@@ -1,67 +1,102 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useWebSocket(projectId, userName) {
+export function useWebSocket(projectId, userEmail) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
+  const ws = useRef(null);
+  const reconnectTimeout = useRef(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
 
   useEffect(() => {
-    if (!projectId || !userName) return;
+    if (!userEmail) return;
 
-    const connectWebSocket = () => {
-      // Determine WebSocket protocol based on current page protocol
+    function connect() {
+      // Prevent too many reconnection attempts
+      if (reconnectAttempts.current >= maxReconnectAttempts) {
+        console.log('Max reconnection attempts reached');
+        return;
+      }
+
+      // Determine WebSocket protocol and port
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws?projectId=${projectId}&userName=${encodeURIComponent(userName)}`;
+      // In development (Vite on 5173), connect to backend port 4000
+      // In production, use same host
+      const isDev = window.location.port === '5173' || window.location.hostname === 'localhost';
+      const host = isDev ? 'localhost:4000' : window.location.host;
+      const wsUrl = `${protocol}//${host}`;
       
-      console.log('Connecting to WebSocket:', wsUrl);
+      console.log(`Connecting to WebSocket: ${wsUrl} (attempt ${reconnectAttempts.current + 1})`);
       
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      try {
+        ws.current = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        setIsConnected(true);
-      };
+        ws.current.onopen = () => {
+          console.log('WebSocket connected successfully');
+          setIsConnected(true);
+          reconnectAttempts.current = 0; // Reset on successful connection
+          
+          // Authenticate the connection
+          ws.current.send(JSON.stringify({
+            type: 'auth',
+            projectId: projectId,
+            userEmail: userEmail
+          }));
+        };
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          console.log('WebSocket message received:', message);
-          setLastMessage(message);
-        } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
-        }
-      };
+        ws.current.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            setLastMessage(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
+        ws.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        setIsConnected(false);
+        ws.current.onclose = (event) => {
+          console.log('WebSocket disconnected', event.code, event.reason);
+          setIsConnected(false);
+          
+          // Only attempt to reconnect if not a normal closure
+          if (event.code !== 1000) {
+            reconnectAttempts.current++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
+            
+            console.log(`Attempting to reconnect in ${delay}ms...`);
+            reconnectTimeout.current = setTimeout(() => {
+              connect();
+            }, delay);
+          }
+        };
+      } catch (error) {
+        console.error('Error creating WebSocket:', error);
+        reconnectAttempts.current++;
         
-        // Attempt to reconnect after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('Attempting to reconnect...');
-          connectWebSocket();
-        }, 3000);
-      };
-    };
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
+        reconnectTimeout.current = setTimeout(() => {
+          connect();
+        }, delay);
+      }
+    }
 
-    connectWebSocket();
+    connect();
 
     // Cleanup on unmount
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
       }
-      if (wsRef.current) {
-        wsRef.current.close();
+      if (ws.current) {
+        // Close with normal closure code
+        ws.current.close(1000, 'Component unmounting');
       }
     };
-  }, [projectId, userName]);
+  }, [projectId, userEmail]);
 
   return { isConnected, lastMessage };
 }
